@@ -1,97 +1,80 @@
+# Importation of the library
 import pandas as pd
-import csv
-import re
+from collections import Counter
+import matplotlib.pyplot as plt
 
-# Read and parse csv
-# Encoding in utf-8 to solve back to line probleme in champ 11742
-df = []
-with open('Export_stutzmann_horae_t65_Work.csv', newline='', encoding='utf-8') as csvfile:
-    csvreader = csv.reader(csvfile, delimiter=',')
-    for row in csvreader:
-        #print(', '.join(row))
-        df.append(row)
-
-# Extraction of useful text whithout blank for text_reuse
-d1 = [item[5] for item in df]
-d1plus = []
-for x in d1:
-    if x:
-        d1plus.append(x)
-
-# faire des statistiques descriptives:
-# nombre de textes,
-nb_texte = len(d1plus)-1 #-1 pour la ligne de titre
-print("Number of texts : ", nb_texte)
-
-# longueur moyenne,
-compt = 0
-
-for d in d1plus:
-    #compt+=len(d.split())#.split() to compt word and not char
-    res = len(re.findall(r'\w+', d))
-    for i in d.split():
-        if i == "<p>" or i == "/>" or i == "<br/>": # not counting tag as words
-            res -= 1
-    compt += res
-
-mn_word = compt/nb_texte
-print("Mean of the words :", mn_word)
-
-# longueur mini,
-min = len(d1plus[2].split())
-
-for d in d1plus:
-    res = len(re.findall(r'\w+', d))
-    for i in d.split():
-        if i == "<p>" or i == "/>" or i == "<br/>":  # not counting tag as words
-            res -= 1
-
-    if res < min : min = res
-
-print("The minimal length :", min)
-
-# longueur max,
-max = len(d1plus[2].split())
-save = 0
-
-for d in d1plus:
-    res = len(re.findall(r'\w+', d))
-    for i in d.split():
-        if i == "<p>" or i == "/>" or i == "<br/>":  # not counting tag as words
-            res -= 1
-
-    if res > max : max = res
-
-print("Th maximum length :", max)
+#parse the file
+df = pd.read_csv('Export_stutzmann_horae_t65_Work.csv')
 
 
+#extract useful reference texts for text_reuse
+df_text = df[["Text"]]
 
 
-#print(len(save))
-#print(d1plus[8108])
-
-s = "Miserere, quaeso, clementissime </p>deus<p> , <p> <br /> <br/>"
-#print(len(s.split()))
-li = ['<p>','</p>']
-#r = s.split('<p>')
-#r = r.split('</p>')
-#r = r.split('<br/>')
-#r = r.split('<br />')
-r = re.split(' <p> | </p> | /> | <br | <br/> | , | . ', s)
-print(r)
-"""
-res = len(re.findall(r'\w+', s))
-for i in s.split():
-    if i == "<p>" or i == "/>" or i == "<br/>":
-        res -= 1
-print(res)
-#print(len(d1plus[345]))
-#print(len(d1plus[345].split()))
-# variance de la longueur en nombre de mots,
-# nombre de mots différents,
-# liste des 100 mots les plus fréquents
-# 100 mots les moins fréquents
-
-# print(type(df))"""
+#refraction of the text
+df_text = df_text.dropna()
+df_text = df_text.reset_index()
 
 
+def clean_text(text):
+    text = text.replace("</p>", " ")
+    text = text.replace("<p>", " ")
+    text = text.replace("<br/>", " ")
+    text = text.replace("<br />", " ")
+    text = text.replace("...", " ")
+    return text.replace(",", " ")
+
+df_text.apply(lambda x: clean_text(x))
+
+df_text['parse_text'] = df_text['Text'].str.split().str.len()
+stat_text = df_text['parse_text'].describe()
+
+# descriptive statistics:
+# number of texts,
+nb_text = stat_text[0]
+print("Number of text : ", nb_text)
+
+
+# average length,
+avg_length = stat_text[1]
+print("Average of words :", avg_length)
+
+
+# minimum length,
+min_length = stat_text[3]
+print("Minimum length : ", min_length)
+
+
+# maximum length,
+max_length = stat_text[7]
+print("Maximum length : ", max_length)
+
+
+# variance of the length in number of words,
+var_length = df_text["parse_text"].var()
+print("Variance of length : ", var_length)
+
+
+# number of different words,
+df_text['Text'].str.lower().str.split()
+list_word = set()
+df_text['Text'].str.lower().str.split().apply(list_word.update)
+nb_diff_word = len(list_word)
+print("Number of different word : ", nb_diff_word)
+
+
+# list of the 100 most frequent words and 100 least frequent words
+most_freq_word = Counter(" ".join(df_text["Text"]).split()).most_common(100)
+print("Most frequent word : ", most_freq_word)
+
+
+# list of the 100 least frequent words
+least_freq_word = Counter(" ".join(df_text["Text"]).split()).most_common(100)[:-100-1:-1]
+print("Least frequent word : ", least_freq_word)
+
+
+
+# distribution graph
+df_text.boxplot(column='parse_text')
+#df_text.hist(column='new')
+plt.show()
