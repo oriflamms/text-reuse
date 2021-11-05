@@ -1,0 +1,44 @@
+stages:
+  - test
+  - build
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+cache:
+  paths:
+    - .cache/pip
+
+linter:
+  stage: test
+  image: python:3
+
+  cache:
+    paths:
+      - .cache/pip
+      - .cache/pre-commit
+
+  except:
+    - schedules
+
+  variables:
+    PRE_COMMIT_HOME: "$CI_PROJECT_DIR/.cache/pre-commit"
+
+  before_script:
+    - pip install pre-commit
+
+  script:
+    - pre-commit run -a
+
+tests:
+  stage: test
+  image: python:3.7
+
+  cache:
+    paths:
+      - .cache/pip
+
+  before_script:
+    - pip install tox
+
+  script:
+    - tox
