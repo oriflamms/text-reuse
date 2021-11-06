@@ -37,15 +37,17 @@ def make_stats(filename):
     df_text["text_length"] = df_text["clean_text"].str.split().str.len()
     stat_text = df_text["text_length"].describe()
     print(stat_text)
+    count, mean, std, min = stat_text[0:4]
+    max = stat_text[7]
 
     # list words with their frequencies
     word_freq = Counter(" ".join(df_text["clean_text"].values).split())
-    print(f"Number of different word : {len(word_freq)}")
-
+    nb_different_words = len(word_freq)
     with open("word_frequencies.csv", "w") as word_file:
+        word_file.write(f"Number of different words : {nb_different_words}\n")
         for (word, freq) in word_freq.most_common():
             word_file.write(f"{word}\t{freq}\n")
-
+    return (count, mean, std, min, max, nb_different_words)
 
 def main():
     """Collect arguments and run."""
