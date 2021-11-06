@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 import os.path
 
-from setuptools import setup
-from setuptools import find_packages
+from setuptools import find_packages, setup
+
 
 def requirements(path):
     assert os.path.exists(path), "Missing requirements {}.format(path)"
@@ -19,6 +19,6 @@ setup(
     author="IRHT-Teklia",
     author_email="charlotte.mauvezin@protonmail.com",
     install_requires=install_requires,
-    packages=find_packages('src'),
-    package_dir={'': 'src'},
+    packages=find_packages("src"),
+    package_dir={"": "src"},
 )
