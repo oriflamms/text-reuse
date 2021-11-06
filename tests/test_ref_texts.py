@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
+
 from horae_reference_texts.parser import make_stats
 
 FIXTURES = os.path.join(
@@ -7,7 +8,9 @@ FIXTURES = os.path.join(
     "data",
 )
 
+
 def test_dummy():
-    count, mean, std, min, max, nb_different_words = make_stats(os.path.join(FIXTURES, 'test_export_heurist_horae.csv'))
-    assert count ==  111
-    
+    count, mean, std, min, max, nb_different_words = make_stats(
+        os.path.join(FIXTURES, "test_export_heurist_horae.csv")
+    )
+    assert count == 111

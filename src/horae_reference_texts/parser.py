@@ -49,6 +49,7 @@ def make_stats(filename):
             word_file.write(f"{word}\t{freq}\n")
     return (count, mean, std, min, max, nb_different_words)
 
+
 def main():
     """Collect arguments and run."""
     parser = argparse.ArgumentParser(
