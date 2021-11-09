@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import argparse
+import csv
 from collections import Counter
 from pathlib import Path
 
@@ -43,21 +44,50 @@ class ReferenceTexts:
         self.df_text["clean_text"] = self.df_text["Text"].apply(clean_text)
 
     def get_statistics(self):
-        """Return the stats"""
+        """Return the stats and create files on frequencies"""
         self.df_text["text_length"] = self.df_text["clean_text"].str.split().str.len()
         stat_text = self.df_text["text_length"].describe()
         self.count, self.mean, self.std, self.min = stat_text[0:4]
         self.max = stat_text[7]
-
         # list words with their frequencies
-        word_freq = Counter(" ".join(self.df_text["clean_text"].values).split())
+        word_freq = Counter(
+            " ".join(self.df_text["clean_text"].values).split()
+        ).most_common()
         self.nb_different_words = len(word_freq)
-        with open("word_frequencies.csv", "w", encoding="utf8") as word_file:
+
+        with open(
+            "word_frequencies.csv", "w", encoding="utf8", newline=""
+        ) as word_file:
+            writer = csv.writer(word_file, delimiter="\t")
             word_file.write(
-                f"Number of different words : " f"{self.nb_different_words}\n"
+                "Number of different word : " + str(self.nb_different_words) + "\n\n"
             )
-            for (word, freq) in word_freq.most_common():
-                word_file.write(f"{word}\t{freq}\n")
+            writer.writerows(word_freq)
+
+        freq_char = Counter(" ".join(self.df_text["clean_text"].values)).most_common()
+        nb_different_chars = len(freq_char)
+
+        with open(
+            "character_frequencies.csv", "w", encoding="utf8", newline=""
+        ) as char_file:
+            writer = csv.writer(char_file, delimiter="\t")
+            char_file.write(
+                "Number of different character : " + str(nb_different_chars) + "\n\n"
+            )
+            writer.writerows(freq_char)
+
+        freq_text = Counter(self.df_text["clean_text"].values).most_common()
+        nb_different_text = len(freq_text)
+
+        with open(
+            "text_frequencies.csv", "w", encoding="utf8", newline=""
+        ) as text_file:
+            writer = csv.writer(text_file, delimiter="\t")
+            text_file.write(
+                "Number of different text : " + str(nb_different_text) + "\n\n"
+            )
+            writer.writerows(freq_text)
+
         return (
             self.count,
             self.mean,
