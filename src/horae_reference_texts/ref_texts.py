@@ -42,6 +42,30 @@ class ReferenceTexts:
         # remove html tags and lower case
         self.df_text["clean_text"] = self.df_text["Text"].apply(clean_text)
 
+    def make_stats(self):
+        """Create a file that report frequencies in text and an other that report frequencies in character"""
+        # Create a file with the frequencies of character among the text
+        freq_char = Counter(" ".join(self.df_text["clean_text"].values))
+        nb_different_chars = len(freq_char)
+
+        with open("character_frequencies.csv", "w", encoding="utf8") as char_file:
+            char_file.write(
+                f"Number of different character : " f"{nb_different_chars}\n"
+            )
+            for (char, freq) in freq_char.most_common():
+                char_file.write(f"{char}\t{freq}\n")
+
+        # Create a file with the frequencies of texts in the corpus
+        freq_text = Counter(self.df_text["clean_text"].values)
+        nb_different_text = len(freq_text)
+
+        with open("text_frequencies.csv", "w", encoding="utf8") as text_file:
+            text_file.write(
+                f"Number of different character : " f"{nb_different_text}\n"
+            )
+            for (text, freq) in freq_text.most_common():
+                text_file.write(f"{text}\t{freq}\n")
+
     def get_statistics(self):
         """Return the stats"""
         self.df_text["text_length"] = self.df_text["clean_text"].str.split().str.len()
