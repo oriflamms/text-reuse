@@ -50,7 +50,9 @@ class ReferenceTexts:
         self.count, self.mean, self.std, self.min = stat_text[0:4]
         self.max = stat_text[7]
         # list words with their frequencies
-        word_freq = Counter(" ".join(self.df_text["clean_text"].values).split())
+        word_freq = Counter(
+            " ".join(self.df_text["clean_text"].values).split()
+        ).most_common()
         self.nb_different_words = len(word_freq)
 
         with open(
@@ -60,9 +62,9 @@ class ReferenceTexts:
             word_file.write(
                 "Number of different word : " + str(self.nb_different_words) + "\n\n"
             )
-            writer.writerows(word_freq.items())
+            writer.writerows(word_freq)
 
-        freq_char = Counter(" ".join(self.df_text["clean_text"].values))
+        freq_char = Counter(" ".join(self.df_text["clean_text"].values)).most_common()
         nb_different_chars = len(freq_char)
 
         with open(
@@ -72,9 +74,9 @@ class ReferenceTexts:
             char_file.write(
                 "Number of different character : " + str(nb_different_chars) + "\n\n"
             )
-            writer.writerows(freq_char.items())
+            writer.writerows(freq_char)
 
-        freq_text = Counter(self.df_text["clean_text"].values)
+        freq_text = Counter(self.df_text["clean_text"].values).most_common()
         nb_different_text = len(freq_text)
 
         with open(
@@ -84,7 +86,7 @@ class ReferenceTexts:
             text_file.write(
                 "Number of different text : " + str(nb_different_text) + "\n\n"
             )
-            writer.writerows(freq_text.items())
+            writer.writerows(freq_text)
 
         return (
             self.count,
