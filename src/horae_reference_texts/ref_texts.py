@@ -41,6 +41,7 @@ class ReferenceTexts:
             return text.lower()
 
         # remove html tags and lower case
+        # self.df_text["clean_text"] = self.df_text["Text"].apply(clean_text)
         self.df_text["clean_text"] = self.df_text["Text"].apply(clean_text)
 
     def get_statistics(self):
