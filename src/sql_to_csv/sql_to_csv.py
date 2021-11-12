@@ -8,6 +8,8 @@ import logging
 import sqlite3
 from pathlib import Path
 
+import tqdm
+
 
 class SqlToCsv:
     def __init__(self, file):
@@ -16,7 +18,7 @@ class SqlToCsv:
         self.conn = None
         self.cursor = None
         self.list_book_id = []
-        self.list_page = []
+        self.list_page_id = []
         self.transcription = []
         logging.basicConfig(format="[%(levelname)s] %(message)s", level=logging.DEBUG)
 
@@ -48,12 +50,11 @@ class SqlToCsv:
             + book_id
             + """')order by created;"""
         )
-        self.list_page = self.cursor.fetchall()
-        logging.info(f"{len(self.list_page)} pages found")
-        return self.list_page
+        self.list_page_id = self.cursor.fetchall()
+        logging.info(f"{len(self.list_page_id)} pages found")
+        return self.list_page_id
 
     def get_transcription_from_pageid_with_paragraph(self, page_id):
-        logging.info(f"looking for transcription in page {page_id}")
         self.cursor.execute(
             """select text from transcription where element_id in (
             select id from element where id in (
@@ -62,26 +63,27 @@ class SqlToCsv:
             + """')
             and type="paragraph" order by polygon)"""
         )
-        translation = self.cursor.fetchall()
-        translation = [phrase[0].replace("\n", " ") for phrase in translation]
-        logging.info(f"{len(translation)} transcriptions found")
-        return " ".join(translation)
+        transcription = self.cursor.fetchall()
+        transcription = [phrase[0].replace("\n", " ") for phrase in transcription]
+        return " ".join(transcription)
 
     def save_book_as_csv(self, book_id):
         """Save the book (page id and transcription) in a csv"""
+        logging.info(f"Saving {book_id}.csv")
         with open(f"{book_id}.csv", "w") as save_book_csv:
             writer = csv.writer(save_book_csv)
-            self.list_page = self.get_list_page(book_id)
-            for i in self.list_page:
-                page_id = i[0]
+            self.list_page_id = self.get_list_page(book_id)
+            logging.info("looking for transcription")
+            for page_id in tqdm(self.list_page_id):
+                page_id = page_id[0]
                 trans = self.get_transcription_from_pageid_with_paragraph(page_id)
                 writer.writerow([page_id, trans])
 
     def save_all_books(self):
         """Save all the book (page id and transcription) in their respective csv named 'id_book'.csv"""
         self.list_book_id = self.get_list_book()
-        for i in self.list_book_id:
-            self.save_book_as_csv(i[0])
+        for book_id in self.list_book_id:
+            self.save_book_as_csv(book_id[0])
 
     def save_some_book(self, nb_book):
         self.cursor.execute(
@@ -89,9 +91,9 @@ class SqlToCsv:
             + str(nb_book)
             + """;"""
         )
-        list_book = self.cursor.fetchall()
-        for i in list_book:
-            self.save_book_as_csv(i[0])
+        list_book_id = self.cursor.fetchall()
+        for book_id in list_book_id:
+            self.save_book_as_csv(book_id[0])
 
 
 def main():
