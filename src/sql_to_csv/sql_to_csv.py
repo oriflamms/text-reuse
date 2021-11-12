@@ -35,9 +35,7 @@ class SqlToCsv:
     def get_list_book(self):
         """Get and return a list of all the books of the db"""
         logging.info("looking for books in the database")
-        self.cursor.execute(
-            """select id from element where type="volume" group by name;"""
-        )
+        self.cursor.execute("""select id from element where type="volume";""")
         self.list_book_id = self.cursor.fetchall()
         logging.info(f"{len(self.list_book_id)} books found")
         return self.list_book_id
