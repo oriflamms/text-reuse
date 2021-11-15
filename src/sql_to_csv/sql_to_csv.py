@@ -28,14 +28,14 @@ class SqlToCsv:
         self.cursor = self.conn.cursor()
         return self
 
-    def __exit__(self):
+    def __exit__(self, *args, **kwargs):
         """Exit the connection of the database"""
         self.conn.close()
 
     def get_list_book(self):
         """Get and return a list of all the books of the db"""
         logging.info("looking for books in the database")
-        self.cursor.execute("""select id from element where type="volume";""")
+        self.cursor.execute('select id from element where type="volume";')
         self.list_book_id = self.cursor.fetchall()
         logging.info(f"{len(self.list_book_id)} books found")
         return self.list_book_id
@@ -44,9 +44,7 @@ class SqlToCsv:
         """Get and return the list of all the page of a book"""
         logging.info(f"looking for pages in book {book_id}")
         self.cursor.execute(
-            """select id from element where id in (select child_id from element_path where parent_id='"""
-            + book_id
-            + """')order by created;"""
+            f"select id from element where id in (select child_id from element_path where parent_id='{book_id}')order by created;"
         )
         self.list_page_id = self.cursor.fetchall()
         logging.info(f"{len(self.list_page_id)} pages found")
@@ -54,12 +52,7 @@ class SqlToCsv:
 
     def get_transcription_from_pageid_with_paragraph(self, page_id):
         self.cursor.execute(
-            """select text from transcription where element_id in (
-            select id from element where id in (
-            select child_id from element_path where parent_id='"""
-            + page_id
-            + """')
-            and type="paragraph" order by polygon)"""
+            f"select text from transcription where element_id in (select id from element where id in (select child_id from element_path where parent_id='{page_id}')and type='paragraph' order by polygon)"
         )
         transcription = self.cursor.fetchall()
         transcription = [phrase[0].replace("\n", " ") for phrase in transcription]
@@ -85,9 +78,7 @@ class SqlToCsv:
 
     def save_some_book(self, nb_book):
         self.cursor.execute(
-            """select * from element where type = 'volume' limit """
-            + str(nb_book)
-            + """;"""
+            f"select * from element where type = 'volume' limit {str(nb_book)};"
         )
         list_book_id = self.cursor.fetchall()
         for book_id in list_book_id:
