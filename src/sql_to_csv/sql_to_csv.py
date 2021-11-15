@@ -107,10 +107,8 @@ def main():
     )
     args = vars(parser.parse_args())
 
-    f = SqlToCsv(args["file"])
-    f.__enter__()
-    f.save_all_books()
-    f.__exit__()
+    with SqlToCsv(args["file"]) as f:
+        f.save_all_books()
 
 
 if __name__ == "__main__":
