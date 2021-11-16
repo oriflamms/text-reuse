@@ -44,6 +44,18 @@ class ReferenceTexts:
         # self.df_text["clean_text"] = self.df_text["Text"].apply(clean_text)
         self.df_text["clean_text"] = self.df_text["Text"].apply(clean_text)
 
+        # creating a dataframe containing the psalm's text
+        self.df_psalm = self.df[self.df["Liturgical function"] == "Psalm"]
+        column = ["Text", "ID Arkindex"]
+        self.df_psalm = self.df_psalm[column]
+        self.df_psalm["clean_text"] = self.df_psalm["Text"].apply(clean_text)
+
+    def write_in_txt(self):
+        """Write in txt file the clean text for each psalm's text in a folder"""
+        for index, row in self.df_psalm.iterrows():
+            with open(f'folder/{row["ID Arkindex"]}.txt', "w") as f:
+                f.write(row["clean_text"])
+
     def get_statistics(self):
         """Return the stats and create files on frequencies"""
         self.df_text["text_length"] = self.df_text["clean_text"].str.split().str.len()
