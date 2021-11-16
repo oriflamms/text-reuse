@@ -50,10 +50,10 @@ class ReferenceTexts:
         self.df_psalm = self.df_psalm[column]
         self.df_psalm["clean_text"] = self.df_psalm["Text"].apply(clean_text)
 
-    def write_in_txt(self):
+    def write_in_txt(self, path):
         """Write in txt file the clean text for each psalm's text in a folder"""
         for index, row in self.df_psalm.iterrows():
-            with open(f'folder/{row["ID Arkindex"]}.txt', "w") as f:
+            with open(f'{path}/{row["ID Arkindex"]}.txt', "w") as f:
                 f.write(row["clean_text"])
 
     def get_statistics(self):
@@ -122,11 +122,20 @@ def main():
         required=True,
         type=Path,
     )
+    parser.add_argument(
+        "--save",
+        required=False,
+        default=False,
+        type=Path,
+    )
 
     args = vars(parser.parse_args())
 
     f = ReferenceTexts(args["file"])
     f.get_statistics()
+
+    if args["save"]:
+        f.write_in_txt(args["save"])
 
 
 if __name__ == "__main__":

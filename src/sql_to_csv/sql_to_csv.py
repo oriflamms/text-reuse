@@ -12,9 +12,10 @@ from tqdm import tqdm
 
 
 class SqlToCsv:
-    def __init__(self, file):
+    def __init__(self, file, savefile):
         """Initialise the class"""
         self.db_name = file
+        self.save_file = savefile
         self.conn = None
         self.cursor = None
         self.list_book_id = []
@@ -61,7 +62,7 @@ class SqlToCsv:
     def save_book_as_csv(self, book_id):
         """Save the book (page id and transcription) in a csv"""
         logging.info(f"Saving {book_id}.csv")
-        with open(f"folder/{book_id}.csv", "w") as save_book_csv:
+        with open(f"{self.save_file}/{book_id}.csv", "w") as save_book_csv:
             writer = csv.writer(save_book_csv)
             self.list_page_id = self.get_list_page(book_id)
             logging.info("looking for transcription")
@@ -77,6 +78,8 @@ class SqlToCsv:
             self.save_book_as_csv(book_id[0])
 
     def save_some_book(self, nb_book):
+        """Save as much books as the function takes
+        You cannot choose the book you save"""
         self.cursor.execute(
             f"select * from element where type = 'volume' limit {str(nb_book)};"
         )
@@ -84,23 +87,52 @@ class SqlToCsv:
         for book_id in list_book_id:
             self.save_book_as_csv(book_id[0])
 
+    def save_all_book_as_txt(self):
+        """Save all the book (page id and transcription) in their respective csv named 'id_book'.csv"""
+        self.list_book_id = self.get_list_book()
+        for book_id in tqdm(self.list_book_id):
+            self.save_book_as_txt(book_id[0])
+
+    def save_book_as_txt(self, book_id):
+        """Save a book in a txt file"""
+        with open(f"{self.save_file}/{book_id}.txt", "w") as file:
+            self.list_page_id = self.get_list_page(book_id)
+            for page_id in self.list_page_id:
+                trans = self.get_transcription_from_pageid_with_paragraph(page_id[0])
+                file.write(trans)
+
 
 def main():
     """Collect arguments and run."""
     parser = argparse.ArgumentParser(
-        description="Take a sql file and return csv file of the books",
+        description="Take a sql file and return csv (default) or txt by file of the books",
     )
     parser.add_argument(
         "--file",
-        help="path of the csv file",
+        help="path of the sqlite db",
         required=True,
         type=Path,
+    )
+    parser.add_argument(
+        "--savefile",
+        help="path where the files will be created",
+        required=True,
+        type=Path,
+    )
+    parser.add_argument(
+        "--txt",
+        help="export also in txt",
+        required=False,
+        default="csv",
     )
 
     args = vars(parser.parse_args())
 
-    with SqlToCsv(args["file"]) as f:
-        f.save_all_books()
+    with SqlToCsv(args["file"], args["savefile"]) as f:
+        if args["txt"] == "csv":
+            f.save_all_books()
+        elif args["txt"] == "txt":
+            f.save_all_book_as_txt()
 
 
 if __name__ == "__main__":
