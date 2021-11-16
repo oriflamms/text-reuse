@@ -8,7 +8,7 @@ import logging
 import sqlite3
 from pathlib import Path
 
-import tqdm
+from tqdm import tqdm
 
 
 class SqlToCsv:
@@ -61,7 +61,7 @@ class SqlToCsv:
     def save_book_as_csv(self, book_id):
         """Save the book (page id and transcription) in a csv"""
         logging.info(f"Saving {book_id}.csv")
-        with open(f"{book_id}.csv", "w") as save_book_csv:
+        with open(f"folder/{book_id}.csv", "w") as save_book_csv:
             writer = csv.writer(save_book_csv)
             self.list_page_id = self.get_list_page(book_id)
             logging.info("looking for transcription")
@@ -73,7 +73,7 @@ class SqlToCsv:
     def save_all_books(self):
         """Save all the book (page id and transcription) in their respective csv named 'id_book'.csv"""
         self.list_book_id = self.get_list_book()
-        for book_id in self.list_book_id:
+        for book_id in tqdm(self.list_book_id):
             self.save_book_as_csv(book_id[0])
 
     def save_some_book(self, nb_book):
@@ -96,6 +96,7 @@ def main():
         required=True,
         type=Path,
     )
+
     args = vars(parser.parse_args())
 
     with SqlToCsv(args["file"]) as f:

@@ -122,6 +122,7 @@ def main():
         required=True,
         type=Path,
     )
+
     args = vars(parser.parse_args())
 
     f = ReferenceTexts(args["file"])
