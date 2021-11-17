@@ -1,0 +1,3 @@
+[submodule "text-matcher"]
+	path = text-matcher
+	url = https://github.com/JonathanReeve/text-matcher

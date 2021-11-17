@@ -3,6 +3,7 @@
 
 import argparse
 import csv
+import re
 from collections import Counter
 from pathlib import Path
 
@@ -28,26 +29,25 @@ class ReferenceTexts:
 
         def clean_text(text):
             """Remove html tags and convert to lowercase"""
-            text = text.replace("</p>", " ")
+            text = re.sub(r"[^\w\s]", "", text)
             text = text.replace("<p>", " ")
-            text = text.replace("<br/>", " ")
+            text = text.replace("</p>", " ")
+            text = text.replace("<br>", " ")
             text = text.replace("<br />", " ")
-            text = text.replace("...", " ")
-            text = text.replace(",", " ")
+            text = text.replace("<br/>", " ")
+            text = text.replace("<sup>", " ")
+            text = text.replace("</sup>", " ")
+            text = text.replace("…", " ")
+            text = text.replace("(...)", " ")
             return text.lower()
 
         # extract useful reference texts for text_reuse
         if self.liturgical_function:
-            # create the useful dataframe for the application of write_in_text
+            # create the dataframe for the application of write_in_text
             self.df_text = self.df[
                 self.df["Liturgical function"] == self.liturgical_function
             ]
-            column = ["Text", "ID Arkindex"]
-            self.df_liturgical_function = self.df_text[column]
-            self.df_liturgical_function["clean_text"] = self.df_liturgical_function[
-                "Text"
-            ].apply(clean_text)
-            self.df_text = self.df_text["Text"]
+            self.df_text = self.df_text[["Text", "ID Arkindex"]]
         else:
             # create the standard dataframe
             self.df_text = self.df[["Text"]]
@@ -61,7 +61,7 @@ class ReferenceTexts:
 
     def write_in_txt(self, output_path):
         """Write in txt file the clean text for each psalm's text in a folder"""
-        for index, row in self.df_liturgical_function.iterrows():
+        for index, row in self.df_text.iterrows():
             with open(f'{output_path}/{row["ID Arkindex"]}.txt', "w") as f:
                 f.write(row["clean_text"])
 
@@ -145,7 +145,7 @@ def main():
         "--liturgical-function",
         help="specifies the liturgical function of the reference's text. Case sensitive",
         required=False,
-        default=[],
+        default="",
     )
 
     args = vars(parser.parse_args())
