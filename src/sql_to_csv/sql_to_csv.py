@@ -12,10 +12,10 @@ from tqdm import tqdm
 
 
 class SqlToCsv:
-    def __init__(self, file, savefile):
+    def __init__(self, file, output_path):
         """Initialise the class"""
         self.db_name = file
-        self.save_file = savefile
+        self.output_path = output_path
         self.conn = None
         self.cursor = None
         self.list_book_id = []
@@ -62,7 +62,7 @@ class SqlToCsv:
     def save_book_as_csv(self, book_id):
         """Save the book (page id and transcription) in a csv"""
         logging.info(f"Saving {book_id}.csv")
-        with open(f"{self.save_file}/{book_id}.csv", "w") as save_book_csv:
+        with open(f"{self.output_path}/{book_id}.csv", "w") as save_book_csv:
             writer = csv.writer(save_book_csv)
             self.list_page_id = self.get_list_page(book_id)
             logging.info("looking for transcription")
@@ -95,7 +95,7 @@ class SqlToCsv:
 
     def save_book_as_txt(self, book_id):
         """Save a book in a txt file"""
-        with open(f"{self.save_file}/{book_id}.txt", "w") as file:
+        with open(f"{self.output_path}/{book_id}.txt", "w") as file:
             self.list_page_id = self.get_list_page(book_id)
             for page_id in self.list_page_id:
                 trans = self.get_transcription_from_pageid_with_paragraph(page_id[0])
@@ -120,18 +120,17 @@ def main():
         type=Path,
     )
     parser.add_argument(
-        "--txt",
-        help="export also in txt",
-        required=False,
-        default="csv",
+        "--output-format",
+        help="choose between an export in csv or in txt",
+        required=True,
     )
 
     args = vars(parser.parse_args())
 
     with SqlToCsv(args["file"], args["savefile"]) as f:
-        if args["txt"] == "csv":
+        if args["output_format"] == "csv":
             f.save_all_books()
-        elif args["txt"] == "txt":
+        elif args["output_format"] == "txt":
             f.save_all_book_as_txt()
 
 

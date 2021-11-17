@@ -10,7 +10,9 @@ FIXTURES = os.path.join(
 
 
 def test_dummy():
-    reftext = ReferenceTexts(os.path.join(FIXTURES, "test_export_heurist_horae.csv"))
+    reftext = ReferenceTexts(
+        os.path.join(FIXTURES, "test_export_heurist_horae.csv"), []
+    )
     count, mean, std, min, max, nb_different_words = reftext.get_statistics()
     assert count == 111
     assert min == 1.0
