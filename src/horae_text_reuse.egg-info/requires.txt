@@ -5,6 +5,7 @@ colorama~=0.4.4
 ipython~=7.29.0
 ipywidgets~=7.6.5
 joblib~=1.1.0
+matcher>=0
 matplotlib~=3.4.3
 nltk~=3.6.5
 notebook~=6.4.5
