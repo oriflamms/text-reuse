@@ -65,6 +65,10 @@ class ReferenceTexts:
             with open(f'{output_path}/{row["ID Arkindex"]}.txt', "w") as f:
                 f.write(row["clean_text"])
 
+    def write_metadata(self, metadata_path):
+        df_metadata = self.df[["ID Arkindex", "ID Annotation"]]
+        df_metadata.to_csv(f"{metadata_path}/metadata", index=False)
+
     def get_statistics(self):
         """Return the stats and create files on frequencies"""
         self.df_text["text_length"] = self.df_text["clean_text"].str.split().str.len()
@@ -147,6 +151,9 @@ def main():
         required=False,
         default="",
     )
+    parser.add_argument(
+        "--metadata-path", help="path of the metadata file", required=False, default=""
+    )
 
     args = vars(parser.parse_args())
 
@@ -155,6 +162,9 @@ def main():
 
     if args["output_path"] and args["liturgical_function"] != []:
         f.write_in_txt(args["output_path"])
+
+    if args["metadata_path"]:
+        f.write_metadata(args["metadata_path"])
 
 
 if __name__ == "__main__":

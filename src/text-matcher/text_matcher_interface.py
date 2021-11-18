@@ -24,7 +24,7 @@ def getting_info(text1, text2, threshold, cutoff, ngrams, stops):
         if filename not in texts:
             texts[filename] = text
 
-    listpouet = []
+    list_object = []
     for index, pair in enumerate(pairs):
         filenameA, filenameB = pair[0], pair[1]
 
@@ -54,15 +54,15 @@ def getting_info(text1, text2, threshold, cutoff, ngrams, stops):
 
         # Write to the log, but only if a match is found.
         if myMatch.numMatches > 0:
-            listpouet.append([pair[1], myMatch.locationsA, myMatch.locationsB])
-    return listpouet
+            list_object.append([pair[1], myMatch.locationsA, myMatch.locationsB])
+    return list_object
 
 
 def interface(txt1, txt2):
 
     f = open("./src/text-matcher/interface.html", "w")
     text = getting_info(txt1, txt2, 3, 5, 3, False)
-
+    text = sorted(text, key=lambda x: x[1])
     f.write(
         """
     <html>
@@ -70,17 +70,28 @@ def interface(txt1, txt2):
     <body>
     <h1>Text matcher interface</h1>"""
     )
-
-    for i in text:
+    file = open(txt1, "r")
+    text_volume = file.read()
+    f.write(
+        '<mark data-entity="match"><div class="tooltip">Hover over green text <span class="tooltiptext">You will '
+        "see the reference text</span></div></mark>"
+    )
+    for i in reversed(text):
         i[0] = i[0].split("/")
         psalm = i[0][-1].replace(".txt", "")
 
-        f.write(
-            f'<p><mark data-entity="psalm id">{psalm}</mark><br> '
-            f'<mark data-entity="position : book of hours">between {i[1][0][0]} and {i[1][0][1]}</mark>'
-            f'<mark data-entity="position : psalm">between {i[2][0][0]} and {i[2][0][1]}</mark><br><br>'
+        text_volume = (
+            text_volume[: i[1][0][1]]
+            + f'<span class="tooltiptext">{psalm}</span></div></mark>'
+            + text_volume[i[1][0][1] :]
+        )
+        text_volume = (
+            text_volume[: i[1][0][0]]
+            + '<mark data-entity="match"><div class="tooltip">'
+            + text_volume[i[1][0][0] :]
         )
 
+    f.write(f"<h2>Text du volume</h2><br>{text_volume}")
     f.write(
         """
     </body>
@@ -100,6 +111,7 @@ def main():
     )
     parser.add_argument("--input-txt", required=True, type=Path)
     parser.add_argument("--input-folder", required=True, type=Path)
+    # parser.add_argument("--input-html", required=True, type=Path)#A mettre en paramettre de interface()
 
     args = vars(parser.parse_args())
 

@@ -24,7 +24,7 @@
      margin: 0px 0px 0.1rem 0.5rem;
 }
 
-[data-entity][data-entity="position : book of hours"] {
+[data-entity][data-entity="match"] {
      background: rgba(166, 226, 45, 0.2);
      border-color: rgb(166, 226, 45);
 }
@@ -180,4 +180,27 @@
 body {
     padding: 25px 50px;
     font: 18px Helvetica, Arial, sans-serif;
+}
+.tooltip {
+  position: relative;
+  display: inline-block;
+  border-bottom: 1px dotted black;
+}
+
+.tooltip .tooltiptext {
+  visibility: hidden;
+  width: 120px;
+  background-color: black;
+  color: #fff;
+  text-align: center;
+  border-radius: 6px;
+  padding: 5px 0;
+
+  /* Position the tooltip */
+  position: absolute;
+  z-index: 1;
+}
+
+.tooltip:hover .tooltiptext {
+  visibility: visible;
 }
