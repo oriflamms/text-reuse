@@ -3,6 +3,7 @@
 
 import argparse
 import csv
+import logging
 import re
 from collections import Counter
 from pathlib import Path
@@ -23,6 +24,7 @@ class ReferenceTexts:
         self.max = 0
         self.nb_different_words = 0
         self.liturgical_function = liturgical_function
+        logging.basicConfig(format="[%(levelname)s] %(message)s", level=logging.DEBUG)
 
         # parse the file
         self.df = pd.read_csv(self.file)
@@ -74,12 +76,18 @@ class ReferenceTexts:
         self.df_text["text_length"] = self.df_text["clean_text"].str.split().str.len()
         stat_text = self.df_text["text_length"].describe()
         self.count, self.mean, self.std, self.min = stat_text[0:4]
+        logging.info(f"count of words :{self.count}")
+        logging.info(f"mean : {self.mean}")
+        logging.info(f"min : {self.min}")
+        logging.info(f"standard deviation : {self.std}")
         self.max = stat_text[7]
+        logging.info(f"max : {self.max}")
         # list words with their frequencies
         word_freq = Counter(
             " ".join(self.df_text["clean_text"].values).split()
         ).most_common()
         self.nb_different_words = len(word_freq)
+        logging.info(f"nb of different words : {self.nb_different_words}")
 
         # Write the frequencies of word in a csv
         with open(

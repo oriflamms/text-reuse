@@ -17,5 +17,5 @@ def test_dummy():
     assert count == 111
     assert min == 1.0
     assert max == 483.0
-    assert nb_different_words == 1457
+    assert nb_different_words == 1456
     assert mean == 28.945945945945947
