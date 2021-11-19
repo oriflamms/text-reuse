@@ -13,3 +13,13 @@ In those texts we calculated the following statistics :
 
 The 100 most used words and 100 least used words are stocked on
 files generated during the computing of the code.
+
+# How to use :
+
+To launch the code :
+* Only the stats : `python src/horae_reference_texts/ref_texts.py --file <path>`
+* Only the stats with a specification on the liturgical function: `python src/horae_reference_texts/ref_texts.py --file <path> --liturgical-function <string>`
+* Stats and output in txt format : `python src/horae_reference_texts/ref_texts.py --file <path> --output-path <path>`
+* Stats and metadata file in csv format : `python src/horae_reference_texts/ref_texts.py --file <path> --metadata-path <path>`
+
+Example : `python src/horae_reference_texts/ref_texts.py --file tests/data/Export_stutzmann_horae_t65_Work.csv --liturgical-function Psalm --output-path /folder/`
