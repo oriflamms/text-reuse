@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import argparse
+import csv
 import itertools
 import webbrowser
 from pathlib import Path
@@ -58,9 +59,9 @@ def getting_info(text1, text2, threshold, cutoff, ngrams, stops):
     return list_object
 
 
-def interface(txt1, txt2):
+def interface(txt1, txt2, metadata_path, html_path):
 
-    f = open("./src/text-matcher/interface.html", "w")
+    f = open(html_path, "w")
     text = getting_info(txt1, txt2, 3, 5, 3, False)
     text = sorted(text, key=lambda x: x[1])
     f.write(
@@ -72,17 +73,25 @@ def interface(txt1, txt2):
     )
     file = open(txt1, "r")
     text_volume = file.read()
+    with open(metadata_path, newline="") as meta_file:
+        data = list(csv.reader(meta_file, delimiter=","))
+
     f.write(
         '<mark data-entity="match"><div class="tooltip">Hover over green text <span class="tooltiptext">You will '
         "see the reference text</span></div></mark>"
     )
+    f.write(f"<br>Number of recognised texts : {str(len(text))}")
     for i in reversed(text):
         i[0] = i[0].split("/")
         psalm = i[0][-1].replace(".txt", "")
 
+        for row in data:
+            if row[0] == psalm:
+                psalm_name = row[1]
+
         text_volume = (
             text_volume[: i[1][0][1]]
-            + f'<span class="tooltiptext">{psalm}</span></div></mark>'
+            + f'<span class="tooltiptext">{psalm_name}</span></div></mark>'
             + text_volume[i[1][0][1] :]
         )
         text_volume = (
@@ -111,12 +120,23 @@ def main():
     )
     parser.add_argument("--input-txt", required=True, type=Path)
     parser.add_argument("--input-folder", required=True, type=Path)
-    # parser.add_argument("--input-html", required=True, type=Path)#A mettre en paramettre de interface()
+    parser.add_argument(
+        "--metadata",
+        help="File with the metadata to indicate the name of the recognised text",
+        required=True,
+        type=Path,
+    )
+    parser.add_argument("--input-html", required=True, type=Path)
 
     args = vars(parser.parse_args())
 
     # getting_info(str(args["input_txt"]), str(args["input_folder"]), 3, 5, 3, False)
-    interface(str(args["input_txt"]), str(args["input_folder"]))
+    interface(
+        str(args["input_txt"]),
+        str(args["input_folder"]),
+        str(args["metadata"]),
+        str(args["input_html"]),
+    )
 
 
 if __name__ == "__main__":

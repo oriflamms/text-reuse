@@ -67,7 +67,7 @@ class ReferenceTexts:
 
     def write_metadata(self, metadata_path):
         df_metadata = self.df[["ID Arkindex", "ID Annotation"]]
-        df_metadata.to_csv(f"{metadata_path}/metadata", index=False)
+        df_metadata.to_csv(f"{metadata_path}/metadata.csv", index=False)
 
     def get_statistics(self):
         """Return the stats and create files on frequencies"""
@@ -140,7 +140,7 @@ def main():
     )
     parser.add_argument(
         "--output-path",
-        help="path of the save files",
+        help="path of the save files for the ref text named after their ID Arkindex",
         required=False,
         default=False,
         type=Path,
@@ -152,7 +152,10 @@ def main():
         default="",
     )
     parser.add_argument(
-        "--metadata-path", help="path of the metadata file", required=False, default=""
+        "--metadata-path",
+        help="path of the save file for metadata",
+        required=False,
+        default="",
     )
 
     args = vars(parser.parse_args())
