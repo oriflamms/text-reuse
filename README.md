@@ -23,9 +23,9 @@ You can also extract the metadata in a csv which contain the Arkindex ID and the
 Example of line commands :
 * Only the stats : `python src/horae_reference_texts/ref_texts.py --file tests/data/Export_stutzmann_horae_t65_Work.csv`
 * Only the stats with a specification on the liturgical function: `python src/horae_reference_texts/ref_texts.py --file tests/data/Export_stutzmann_horae_t65_Work.csv --liturgical-function Psalm`
-* Stats and output in txt format : `python src/horae_reference_texts/ref_texts.py --file tests/data/Export_stutzmann_horae_t65_Work.csv --outpath-path folder/`
+* Stats and output in txt format : `python src/horae_reference_texts/ref_texts.py --file tests/data/test_export_heurist_horae.csv --text-path folder/`
 * Stats and metadata file in csv format : `python src/horae_reference_texts/ref_texts.py --file tests/data/Export_stutzmann_horae_t65_Work.csv --metadata-path folder/`
-* Stats, metadata and output in txt file : `python src/horae_reference_texts/ref_texts.py --file tests/data/Export_stutzmann_horae_t65_Work.csv --metadata-path folder/ --output-path folder/`
+* Stats, metadata and output in txt file : `python src/horae_reference_texts/ref_texts.py --file tests/data/Export_stutzmann_horae_t65_Work.csv --metadata-path folder/ --text-path folder/`
 
 
 ### sql-to-csv

@@ -5,6 +5,7 @@
 import argparse
 import csv
 import logging
+import os.path
 import sqlite3
 from pathlib import Path
 
@@ -53,7 +54,8 @@ class SqlToCsv:
 
     def get_transcription_from_pageid_with_paragraph(self, page_id):
         self.cursor.execute(
-            f"select text from transcription where element_id in (select id from element where id in (select child_id from element_path where parent_id='{page_id}')and type='paragraph' order by polygon)"
+            f"select text from transcription where element_id in (select id from element where id in ("
+            f"select child_id from element_path where parent_id='{page_id}')and type='paragraph' order by polygon)"
         )
         transcription = self.cursor.fetchall()
         transcription = [phrase[0].replace("\n", " ") for phrase in transcription]
@@ -62,7 +64,9 @@ class SqlToCsv:
     def save_book_as_csv(self, book_id):
         """Save the book (page id and transcription) in a csv"""
         logging.info(f"Saving {book_id}.csv")
-        with open(f"{self.output_path}/{book_id}.csv", "w") as save_book_csv:
+        with open(
+            os.path.join(self.output_path, f"{book_id}.csv"), "w"
+        ) as save_book_csv:
             writer = csv.writer(save_book_csv)
             self.list_page_id = self.get_list_page(book_id)
             logging.info("looking for transcription")
@@ -95,7 +99,7 @@ class SqlToCsv:
 
     def save_book_as_txt(self, book_id):
         """Save a book in a txt file"""
-        with open(f"{self.output_path}/{book_id}.txt", "w") as file:
+        with open(os.path.join(self.output_path, f"{book_id}.txt"), "w") as file:
             self.list_page_id = self.get_list_page(book_id)
             for page_id in self.list_page_id:
                 trans = self.get_transcription_from_pageid_with_paragraph(page_id[0])

@@ -4,6 +4,7 @@
 import argparse
 import csv
 import logging
+import os.path
 import re
 from collections import Counter
 from pathlib import Path
@@ -52,7 +53,7 @@ class ReferenceTexts:
             self.df_text = self.df_text[["Text", "ID Arkindex"]]
         else:
             # create the standard dataframe
-            self.df_text = self.df[["Text"]]
+            self.df_text = self.df[["Text", "ID Arkindex"]]
 
         # refraction of the text
         self.df_text = self.df_text.dropna()
@@ -60,16 +61,18 @@ class ReferenceTexts:
 
         # remove html tags and lower case
         self.df_text["clean_text"] = self.df_text["Text"].apply(clean_text)
+        print(self.df_text["ID Arkindex"])
 
     def write_in_txt(self, output_path):
         """Write in txt file the clean text for each psalm's text in a folder"""
         for index, row in self.df_text.iterrows():
-            with open(f'{output_path}/{row["ID Arkindex"]}.txt', "w") as f:
+            with open(os.path.join(output_path, f'{row["ID Arkindex"]}.txt'), "w") as f:
                 f.write(row["clean_text"])
 
     def write_metadata(self, metadata_path):
-        df_metadata = self.df[["ID Arkindex", "ID Annotation"]]
-        df_metadata.to_csv(f"{metadata_path}/metadata.csv", index=False)
+        self.df[["ID Arkindex", "ID Annotation"]].to_csv(
+            os.path.join(metadata_path, "metadata.csv"), index=False
+        )
 
     def get_statistics(self):
         """Return the stats and create files on frequencies"""
@@ -147,7 +150,7 @@ def main():
         type=Path,
     )
     parser.add_argument(
-        "--output-path",
+        "--text-path",
         help="path of the save files for the ref text named after their ID Arkindex",
         required=False,
         default=False,
@@ -171,8 +174,8 @@ def main():
     f = ReferenceTexts(args["file"], args["liturgical_function"])
     f.get_statistics()
 
-    if args["output_path"] and args["liturgical_function"] != []:
-        f.write_in_txt(args["output_path"])
+    if args["text_path"] and args["liturgical_function"] != []:
+        f.write_in_txt(args["text_path"])
 
     if args["metadata_path"]:
         f.write_metadata(args["metadata_path"])
