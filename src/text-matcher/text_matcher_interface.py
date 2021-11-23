@@ -100,7 +100,7 @@ def interface(txt1, txt2, metadata_path, html_path):
             + text_volume[i[1][0][0] :]
         )
 
-    f.write(f"<h2>Text du volume</h2><br>{text_volume}")
+    f.write(f"<h2>Text du volume</h2><br><p>{text_volume}</p>")
     f.write(
         """
     </body>
