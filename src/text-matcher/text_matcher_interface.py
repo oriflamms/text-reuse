@@ -4,6 +4,7 @@
 import argparse
 import csv
 import itertools
+import os.path
 import webbrowser
 from pathlib import Path
 
@@ -60,28 +61,34 @@ def getting_info(text1, text2, threshold, cutoff, ngrams, stops):
 
 
 def interface(txt1, txt2, metadata_path, html_path):
-
     f = open(html_path, "w")
     text = getting_info(txt1, txt2, 3, 5, 3, False)
     text = sorted(text, key=lambda x: x[1])
-    f.write(
-        """
-    <html>
-    <head><link rel="stylesheet" href="style.css"></head>
-    <body>
-    <h1>Text matcher interface</h1>"""
-    )
+
     file = open(txt1, "r")
     text_volume = file.read()
+
     with open(metadata_path, newline="") as meta_file:
         data = list(csv.reader(meta_file, delimiter=","))
 
+    volume = txt1.split("/")
+    psalm = volume[-1].replace(".txt", "")
+
+    link_volume = os.path.join("https://arkindex.teklia.com/element/", psalm)
+
     f.write(
-        '<mark data-entity="match"><div class="tooltip">Hover over green text <span class="tooltiptext">You will '
-        "see the reference text</span></div></mark>"
+        '<html><head><meta charset="UTF-8"><link rel="stylesheet" href="test_style.css"><title>Text Matcher</title></head><body>'
     )
-    f.write(f"<br>Number of recognised texts : {str(len(text))}")
+    f.write("<h1>Text matcher interface</h1>")
+    f.write(f'<p><a href="{link_volume}">Lien du volume sur Arkindex</a></p>')
+    f.write(f"<p><br>Number of recognised texts : {str(len(text))}</p>")
+
     for i in reversed(text):
+        file = open(f"{i[0]}", "rb")
+        text_psaume = file.read()
+        # with open(f"{i[0]}", "rb") as filin:
+        #    text_psaume = filin.read()
+
         i[0] = i[0].split("/")
         psalm = i[0][-1].replace(".txt", "")
 
@@ -91,26 +98,17 @@ def interface(txt1, txt2, metadata_path, html_path):
 
         text_volume = (
             text_volume[: i[1][0][1]]
-            + f'<span class="tooltiptext">{psalm_name}</span></div></mark>'
+            + f'</mark></a><span class="marginnote"><b>{psalm_name}</b><br>{text_psaume[: i[2][0][0]]}<mark>{text_psaume[i[2][0][0]:i[2][0][1]]}</mark>{text_psaume[i[2][0][1]:]}</span>'
             + text_volume[i[1][0][1] :]
         )
         text_volume = (
             text_volume[: i[1][0][0]]
-            + '<mark data-entity="match"><div class="tooltip">'
+            + '<a href="https://www.whaou.com/"><mark>'
             + text_volume[i[1][0][0] :]
         )
-
-    f.write(f"<h2>Text du volume</h2><br><p>{text_volume}</p>")
-    f.write(
-        """
-    </body>
-    </html>
-    """
-    )
-
-    # close the file
+    f.write(f"<h2>Text du volume</h2><p>{text_volume}</p>")
+    f.write("</body></html>")
     f.close()
-
     webbrowser.open("./src/text-matcher/interface.html")
 
 
