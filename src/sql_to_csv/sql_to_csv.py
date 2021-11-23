@@ -65,7 +65,8 @@ class SqlToCsv:
         df = pd.DataFrame(self.cursor.fetchall(), columns=["text"])
         return self.get_transcription_df_single_page(df)
 
-    def get_transcription_df_single_page(self, df):
+    @staticmethod
+    def get_transcription_df_single_page(df):
         transcription = ""
         for index, row in df.iterrows():
             transcription += row["text"] + " "
@@ -149,7 +150,8 @@ class SqlToCsv:
 
         return self.get_transcription_double_page_df(df)
 
-    def get_transcription_double_page_df(self, df):
+    @staticmethod
+    def get_transcription_double_page_df(df):
         """Extract the transcription from data"""
         df["polygon"] = df.polygon.apply(lambda x: Polygon(ast.literal_eval(str(x))))
         df["x_axis"] = df.polygon.apply(lambda a: a.centroid.x)  # order on which page
