@@ -10,8 +10,8 @@ FIXTURES = os.path.join(
 )
 
 
-def test_dummy():
-    # get the dummy file test
+def test_text_from_elements():
+    # get the elements as dataframe
     df_simple = pd.read_csv(
         os.path.join(FIXTURES, "single48f50e0e-4874-451e-b47a-0e6f6859d9c2.csv")
     )
@@ -19,7 +19,7 @@ def test_dummy():
         os.path.join(FIXTURES, "double1bdc52cf-49ad-4ffd-b510-2efb2ff38f84.csv")
     )
 
-    # apply the function
+    # extract the text
     test_simple = SqlToCsv.get_transcription_df_single_page(df_simple)
     test_double = SqlToCsv.get_transcription_double_page_df(df_double)
 
