@@ -41,7 +41,7 @@ repos:
     hooks:
       - id: codespell
         args: ['--write-changes']
-        exclude: '\.csv$'
+        exclude: (tests/data/|data/|src/text-matcher/interface.html)
   - repo: meta
     hooks:
       - id: check-useless-excludes
