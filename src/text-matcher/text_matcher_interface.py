@@ -84,10 +84,8 @@ def interface(txt1, txt2, metadata_path, html_path):
     f.write(f"<p><br>Number of recognised texts : {str(len(text))}</p>")
 
     for i in reversed(text):
-        file = open(f"{i[0]}", "rb")
+        file = open(f"{i[0]}", "r")
         text_psaume = file.read()
-        # with open(f"{i[0]}", "rb") as filin:
-        #    text_psaume = filin.read()
 
         i[0] = i[0].split("/")
         psalm = i[0][-1].replace(".txt", "")
@@ -95,6 +93,12 @@ def interface(txt1, txt2, metadata_path, html_path):
         for row in data:
             if row[0] == psalm:
                 psalm_name = row[1]
+                work_id = row[2]
+
+        link_horae = os.path.join(
+            "https://heurist.huma-num.fr/heurist/hclient/framecontent/recordEdit.php?db=stutzmann_horae&recID=",
+            work_id,
+        )
 
         text_volume = (
             text_volume[: i[1][0][1]]
@@ -103,9 +107,11 @@ def interface(txt1, txt2, metadata_path, html_path):
         )
         text_volume = (
             text_volume[: i[1][0][0]]
-            + '<a href="https://www.whaou.com/"><mark>'
+            + f'<a href="{link_horae}"><mark>'
             + text_volume[i[1][0][0] :]
         )
+
+    # text_volume = str(text_volume).replace("\xa0", " ")
     f.write(f"<h2>Text du volume</h2><p>{text_volume}</p>")
     f.write("</body></html>")
     f.close()

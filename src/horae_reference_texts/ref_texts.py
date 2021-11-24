@@ -66,12 +66,16 @@ class ReferenceTexts:
     def write_in_txt(self, output_path):
         """Write in txt file the clean text for each psalm's text in a folder"""
         for index, row in self.df_text.iterrows():
-            with open(os.path.join(output_path, f'{row["ID Arkindex"]}.txt'), "w") as f:
+            with open(
+                os.path.join(output_path, f'{row["ID Arkindex"]}.txt'),
+                "w",
+                encoding="utf8",
+            ) as f:
                 f.write(row["clean_text"])
 
     def write_metadata(self, metadata_path):
-        self.df[["ID Arkindex", "ID Annotation"]].to_csv(
-            os.path.join(metadata_path, "metadata.csv"), index=False
+        self.df[["ID Arkindex", "ID Annotation", "Work H-ID"]].to_csv(
+            os.path.join(metadata_path, "../../data/metadata.csv"), index=False
         )
 
     def get_statistics(self):
