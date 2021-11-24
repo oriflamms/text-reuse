@@ -77,7 +77,7 @@ def interface(txt1, txt2, metadata_path, html_path):
     link_volume = os.path.join("https://arkindex.teklia.com/element/", psalm)
 
     f.write(
-        '<html><head><meta charset="UTF-8"><link rel="stylesheet" href="test_style.css"><title>Text Matcher</title></head><body>'
+        '<html><head><meta charset="UTF-8"><link rel="stylesheet" href="style.css"><title>Text Matcher</title></head><body>'
     )
     f.write("<h1>Text matcher interface</h1>")
     f.write(f'<p><a href="{link_volume}">Lien du volume sur Arkindex</a></p>')
