@@ -50,7 +50,7 @@ class SqlToCsv:
         """Get and return the list of all the page of a book"""
         logging.info(f"looking for pages in book {book_id}")
         self.cursor.execute(
-            f"select id from element where id in (select child_id from element_path where parent_id='{book_id}')order by created;"
+            f"select child_id, ordering from element_path where parent_id = '{book_id}' order by ordering;"
         )
         self.list_page_id = self.cursor.fetchall()
         logging.info(f"{len(self.list_page_id)} pages found")

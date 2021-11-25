@@ -45,4 +45,4 @@ You have to specify the path of the metadata file that have information on the I
 You also have to specify the path of the HTML file where the script will be written. !!! Careful the code will overwrite it and you will loose what's on it !!!
 
 Example of line commands :
-* `python src/text-matcher/text_matcher_interface.py --input-txt data/50texts/0a7da4a2-23ad-4d97-a868-c2960f1f0d2a.txt --input-folder data/psalm/ --metadata tests/data/metadata.csv  --input-html src/text-matcher/interface.html`
+* `python src/text-matcher/text_matcher_interface.py --input-txt tests/data/test_volume/0a7da4a2-23ad-4d97-a868-c2960f1f0d2a.txt --input-folder tests/data/test_psaume/ --metadata tests/data/metadata.csv --output-html src/text-matcher/interface.html`

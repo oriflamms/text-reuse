@@ -4,11 +4,14 @@
 import argparse
 import csv
 import itertools
-import webbrowser
-from pathlib import Path
+import os.path
+from pathlib import Path, PurePosixPath
 
 from text_matcher.matcher import Matcher, Text
 from text_matcher.text_matcher import getFiles
+
+ARKINDEX_VOLUME_URL = "https://arkindex.teklia.com/element/"
+HEURIST_TEXT_URL = "https://heurist.huma-num.fr/heurist/hclient/framecontent/recordEdit.php?db=stutzmann_horae&recID="
 
 
 def getting_info(text1, text2, threshold, cutoff, ngrams, stops):
@@ -60,82 +63,99 @@ def getting_info(text1, text2, threshold, cutoff, ngrams, stops):
 
 
 def interface(txt1, txt2, metadata_path, html_path):
-
-    f = open(html_path, "w")
+    # Prepare the list of match
     text = getting_info(txt1, txt2, 3, 5, 3, False)
+    # Ordering the list of match by order of apparition in the text
     text = sorted(text, key=lambda x: x[1])
-    f.write(
-        """
-    <html>
-    <head><link rel="stylesheet" href="style.css"></head>
-    <body>
-    <h1>Text matcher interface</h1>"""
-    )
-    file = open(txt1, "r")
-    text_volume = file.read()
+
+    # Read the text of the volume
+    with open(txt1, "r") as text_of_interest_file:
+        text_volume = text_of_interest_file.read()
+
+    # Read the metadata
     with open(metadata_path, newline="") as meta_file:
         data = list(csv.reader(meta_file, delimiter=","))
 
-    f.write(
-        '<mark data-entity="match"><div class="tooltip">Hover over green text <span class="tooltiptext">You will '
-        "see the reference text</span></div></mark>"
-    )
-    f.write(f"<br>Number of recognised texts : {str(len(text))}")
+    # Fetch the id of the volume
+    volume = os.path.basename(txt1)
+    volume_id = volume.replace(".txt", "")
+
+    # Creation of the link for the html
+    volume_url = os.path.join(ARKINDEX_VOLUME_URL, volume_id)
+
+    # Injecting the text of the volume with html marker
     for i in reversed(text):
-        i[0] = i[0].split("/")
-        psalm = i[0][-1].replace(".txt", "")
+        with open(f"{i[0]}", "r") as psalm_file:
+            psalm_text = psalm_file.read()
+
+        # Fetch psalm id from input folder to create heurist link
+        psalm_id = os.path.basename(i[0])
+        psalm_id = psalm_id.replace(".txt", "")
 
         for row in data:
-            if row[0] == psalm:
+            if row[0] == psalm_id:
                 psalm_name = row[1]
+                work_id = row[2]
 
+        heurist_link = os.path.join(HEURIST_TEXT_URL, work_id)
+
+        # Highlighting the matches and putting the link
         text_volume = (
             text_volume[: i[1][0][1]]
-            + f'<span class="tooltiptext">{psalm_name}</span></div></mark>'
+            + f'</mark></a><span class="marginnote"><b>{psalm_name}</b><br>{psalm_text[: i[2][0][0]]}<mark>{psalm_text[i[2][0][0]:i[2][0][1]]}</mark>{psalm_text[i[2][0][1]:]}</span>'
             + text_volume[i[1][0][1] :]
         )
         text_volume = (
             text_volume[: i[1][0][0]]
-            + '<mark data-entity="match"><div class="tooltip">'
+            + f'<a href="{heurist_link}"><mark>'
             + text_volume[i[1][0][0] :]
         )
 
-    f.write(f"<h2>Text du volume</h2><br>{text_volume}")
-    f.write(
-        """
-    </body>
-    </html>
-    """
-    )
-
-    # close the file
-    f.close()
-
-    webbrowser.open("./src/text-matcher/interface.html")
+    # Open and write in the html
+    with open(html_path, "w") as html_file:
+        html_file.write(
+            '<html><head><meta charset="UTF-8"><link rel="stylesheet" href="style.css"><title>Text Matcher</title></head><body>'
+        )
+        html_file.write("<h1>Text matcher interface</h1>")
+        html_file.write(
+            f'<p><a href="{volume_url}">Lien du volume sur Arkindex</a></p>'
+        )
+        html_file.write(f"<p><br>Number of recognised texts : {str(len(text))}</p>")
+        html_file.write(f"<h2>Text du volume</h2><p>{text_volume}</p>")
+        html_file.write("</body></html>")
 
 
 def main():
     parser = argparse.ArgumentParser(
         description="Take a text and a repertory of text and find correspondence",
     )
-    parser.add_argument("--input-txt", required=True, type=Path)
-    parser.add_argument("--input-folder", required=True, type=Path)
+    parser.add_argument(
+        "--input-txt",
+        required=True,
+        type=Path,
+        help="Path of the text of interest",
+    )
+    parser.add_argument(
+        "--input-folder",
+        required=True,
+        type=Path,
+        help="Path of the folder of the text of reference",
+    )
     parser.add_argument(
         "--metadata",
         help="File with the metadata to indicate the name of the recognised text",
         required=True,
         type=Path,
     )
-    parser.add_argument("--input-html", required=True, type=Path)
+    parser.add_argument("--output-html", required=True, type=Path)
 
     args = vars(parser.parse_args())
 
-    # getting_info(str(args["input_txt"]), str(args["input_folder"]), 3, 5, 3, False)
     interface(
-        str(args["input_txt"]),
-        str(args["input_folder"]),
-        str(args["metadata"]),
-        str(args["input_html"]),
+        args["input_txt"],
+        PurePosixPath(args["input_folder"]).as_posix(),
+        args["metadata"],
+        args["output_html"],
     )
 
 
