@@ -75,7 +75,7 @@ class ReferenceTexts:
 
     def write_metadata(self, metadata_path):
         self.df[["ID Arkindex", "ID Annotation", "Work H-ID"]].to_csv(
-            os.path.join(metadata_path, "../../data/metadata.csv"), index=False
+            os.path.join(metadata_path, "metadata.csv"), index=False
         )
 
     def get_statistics(self):
