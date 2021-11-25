@@ -5,11 +5,13 @@ import argparse
 import csv
 import itertools
 import os.path
-import webbrowser
 from pathlib import Path, PurePosixPath
 
 from text_matcher.matcher import Matcher, Text
 from text_matcher.text_matcher import getFiles
+
+ARKINDEX_VOLUME_URL = "https://arkindex.teklia.com/element/"
+HEURIST_TEXT_URL = "https://heurist.huma-num.fr/heurist/hclient/framecontent/recordEdit.php?db=stutzmann_horae&recID="
 
 
 def getting_info(text1, text2, threshold, cutoff, ngrams, stops):
@@ -79,10 +81,7 @@ def interface(txt1, txt2, metadata_path, html_path):
     volume_id = volume.replace(".txt", "")
 
     # Creation of the link for the html
-    ARKINDEX_VOLUME_URL = os.path.join(
-        "https://arkindex.teklia.com/element/", volume_id
-    )
-    HEURIST_TEXT_URL = "https://heurist.huma-num.fr/heurist/hclient/framecontent/recordEdit.php?db=stutzmann_horae&recID="
+    volume_url = os.path.join(ARKINDEX_VOLUME_URL, volume_id)
 
     # Injecting the text of the volume with html marker
     for i in reversed(text):
@@ -119,14 +118,11 @@ def interface(txt1, txt2, metadata_path, html_path):
         )
         html_file.write("<h1>Text matcher interface</h1>")
         html_file.write(
-            f'<p><a href="{ARKINDEX_VOLUME_URL}">Lien du volume sur Arkindex</a></p>'
+            f'<p><a href="{volume_url}">Lien du volume sur Arkindex</a></p>'
         )
         html_file.write(f"<p><br>Number of recognised texts : {str(len(text))}</p>")
         html_file.write(f"<h2>Text du volume</h2><p>{text_volume}</p>")
         html_file.write("</body></html>")
-
-    # Open the html in a web browser
-    webbrowser.open(os.path.join(html_path))
 
 
 def main():

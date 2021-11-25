@@ -29,6 +29,7 @@ repos:
       - id: check-symlinks
       - id: debug-statements
       - id: trailing-whitespace
+        exclude: (tests/data/|data/)
       - id: check-yaml
         args: [--allow-multiple-documents]
       - id: mixed-line-ending
