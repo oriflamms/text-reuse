@@ -126,7 +126,7 @@ def interface(txt1, txt2, metadata_path, html_path):
         html_file.write("</body></html>")
 
     # Open the html in a web browser
-    webbrowser.open("./src/text-matcher/interface.html")
+    webbrowser.open(os.path.join(html_path))
 
 
 def main():
