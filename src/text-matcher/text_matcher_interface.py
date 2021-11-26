@@ -125,6 +125,16 @@ def interface(txt1, txt2, metadata_path, html_path):
         html_file.write("</body></html>")
 
 
+def create_html(volume_folder, reference_folder, metadata, save_path):
+    texts = getFiles(volume_folder)
+
+    for filename in texts:
+        volume_id = os.path.basename(filename)
+        volume_html = volume_id.replace(".txt", ".html")
+        volume_path = os.path.join(save_path, volume_html)
+        interface(str(filename), str(reference_folder), metadata, volume_path)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Take a text and a repertory of text and find correspondence",
@@ -139,7 +149,7 @@ def main():
         "--input-folder",
         required=True,
         type=Path,
-        help="Path of the folder of the text of reference",
+        help="Path of the folder of the text of reference, please be sure to put the css in the same folder",
     )
     parser.add_argument(
         "--metadata",
@@ -151,11 +161,18 @@ def main():
 
     args = vars(parser.parse_args())
 
+    """
     interface(
         args["input_txt"],
         PurePosixPath(args["input_folder"]).as_posix(),
         args["metadata"],
         args["output_html"],
+    )"""
+    create_html(
+        PurePosixPath(args["input_txt"]).as_posix(),
+        PurePosixPath(args["input_folder"]),
+        str(args["metadata"]),
+        PurePosixPath(args["output_html"]),
     )
 
 
