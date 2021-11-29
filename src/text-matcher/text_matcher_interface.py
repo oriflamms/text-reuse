@@ -4,6 +4,7 @@
 import argparse
 import csv
 import itertools
+import logging
 import os.path
 from pathlib import Path, PurePosixPath
 
@@ -61,6 +62,10 @@ def getting_info(text1, text2, threshold, cutoff, ngrams, stops):
             list_object.append([pair[1], myMatch.locationsA, myMatch.locationsB])
     return list_object
 
+def normalize(txt):
+    txt.replace('j', 'i'),
+    txt.replace('v', 'u')
+    return txt
 
 def interface(txt1, txt2, metadata_path, html_path):
     # Prepare the list of match
@@ -163,6 +168,12 @@ def main():
         type=Path,
         help="Path where the html will be located, please be sure to put the css in the same folder",
     )
+    parser.add_argument(
+        "--normalize",
+        help='Turn j into i, v into u',
+        default='True',
+        required=False
+    )
 
     args = vars(parser.parse_args())
 
@@ -179,6 +190,11 @@ def main():
         str(args["metadata"]),
         PurePosixPath(args["output_html"]),
     )
+    # Normalize the text before application of the interface
+    if args["normalize"].lower() in ('true, t, 1, yes, y'):
+        logging.info('True')
+    else:
+        logging.info('False')
 
 
 if __name__ == "__main__":
