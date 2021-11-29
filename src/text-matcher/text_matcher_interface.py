@@ -149,7 +149,7 @@ def main():
         "--input-folder",
         required=True,
         type=Path,
-        help="Path of the folder of the text of reference, please be sure to put the css in the same folder",
+        help="Path of the folder of the text of reference",
     )
     parser.add_argument(
         "--metadata",
@@ -157,7 +157,12 @@ def main():
         required=True,
         type=Path,
     )
-    parser.add_argument("--output-html", required=True, type=Path)
+    parser.add_argument(
+        "--output-html",
+        required=True,
+        type=Path,
+        help="Path where the html will be located, please be sure to put the css in the same folder",
+    )
 
     args = vars(parser.parse_args())
 
