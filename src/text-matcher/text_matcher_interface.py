@@ -16,10 +16,11 @@ HEURIST_TEXT_URL = "https://heurist.huma-num.fr/heurist/hclient/framecontent/rec
 
 
 def normalize_txt(txt):
-    txt = txt.lower().replace("\xa0", " ")
-    txt = (txt.lower().replace("j", "i"),)
+    txt = txt.replace("\xa0", " ")
+    txt = txt.replace("j", "i")
     txt = "".join(txt)
-    txt = txt.lower().replace("u", "v")
+    txt = txt.replace("u", "v")
+    logging.info("normalization done")
     return txt
 
 
@@ -184,9 +185,10 @@ def main():
     )
     parser.add_argument(
         "--normalize",
-        help='Turn j into i, v into u',
-        default='True',
-        required=False
+        help="Turn j into i, v into u",
+        default="True",
+        required=False,
+        action="store_true",
     )
 
     args = vars(parser.parse_args())
@@ -206,7 +208,7 @@ def main():
     )
 
     # Normalize the text before application of the interface
-    if args["normalize"].lower() in ("true, t, 1, yes, y"):
+    if args["normalize"].lower():
         interface(
             args["input_txt"],
             PurePosixPath(args["input_folder"]).as_posix(),
@@ -214,7 +216,7 @@ def main():
             args["output_html"],
             True,
         )
-        logging.info("True")
+        logging.info("normalization done")
     else:
         interface(
             args["input_txt"],
@@ -223,7 +225,6 @@ def main():
             args["output_html"],
             False,
         )
-        logging.info("False")
 
 
 if __name__ == "__main__":
