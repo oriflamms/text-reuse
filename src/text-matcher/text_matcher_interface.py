@@ -4,6 +4,7 @@
 import argparse
 import csv
 import itertools
+import logging
 import os.path
 from pathlib import Path, PurePosixPath
 
@@ -14,7 +15,16 @@ ARKINDEX_VOLUME_URL = "https://arkindex.teklia.com/element/"
 HEURIST_TEXT_URL = "https://heurist.huma-num.fr/heurist/hclient/framecontent/recordEdit.php?db=stutzmann_horae&recID="
 
 
-def getting_info(text1, text2, threshold, cutoff, ngrams, stops):
+def normalize_txt(txt):
+    txt = txt.replace("\xa0", " ")
+    txt = txt.replace("j", "i")
+    txt = "".join(txt)
+    txt = txt.replace("u", "v")
+    logging.info("normalization done")
+    return txt
+
+
+def getting_info(text1, text2, threshold, cutoff, ngrams, stops, normalize):
     texts1 = getFiles(text1)
     texts2 = getFiles(text2)
 
@@ -35,7 +45,12 @@ def getting_info(text1, text2, threshold, cutoff, ngrams, stops):
         # Put this in a dictionary so we don't have to process a file twice.
         for filename in [filenameA, filenameB]:
             if filename not in prevTextObjs:
-                prevTextObjs[filename] = Text(texts[filename], filename)
+                if normalize:
+                    prevTextObjs[filename] = Text(
+                        normalize_txt(texts[filename]), filename
+                    )
+                else:
+                    prevTextObjs[filename] = Text(texts[filename], filename)
 
         # Just more convenient naming.
         textObjA = prevTextObjs[filenameA]
@@ -62,15 +77,17 @@ def getting_info(text1, text2, threshold, cutoff, ngrams, stops):
     return list_object
 
 
-def interface(txt1, txt2, metadata_path, html_path):
+def interface(txt1, txt2, metadata_path, html_path, normalize):
     # Prepare the list of match
-    text = getting_info(txt1, txt2, 3, 5, 3, False)
+    match = getting_info(txt1, txt2, 3, 5, 3, False, normalize)
     # Ordering the list of match by order of apparition in the text
-    text = sorted(text, key=lambda x: x[1])
+    match = sorted(match, key=lambda x: x[1])
 
     # Read the text of the volume
     with open(txt1, "r") as text_of_interest_file:
         text_volume = text_of_interest_file.read()
+        if normalize:
+            text_volume = normalize_txt(text_volume)
 
     # Read the metadata
     with open(metadata_path, newline="") as meta_file:
@@ -84,9 +101,11 @@ def interface(txt1, txt2, metadata_path, html_path):
     volume_url = os.path.join(ARKINDEX_VOLUME_URL, volume_id)
 
     # Injecting the text of the volume with html marker
-    for i in reversed(text):
+    for i in reversed(match):
         with open(f"{i[0]}", "r") as psalm_file:
             psalm_text = psalm_file.read()
+            if normalize:
+                psalm_text = normalize_txt(psalm_text)
 
         # Fetch psalm id from input folder to create heurist link
         psalm_id = os.path.basename(i[0])
@@ -120,7 +139,7 @@ def interface(txt1, txt2, metadata_path, html_path):
         html_file.write(
             f'<p><a href="{volume_url}">Lien du volume sur Arkindex</a></p>'
         )
-        html_file.write(f"<p><br>Number of recognised texts : {str(len(text))}</p>")
+        html_file.write(f"<p><br>Number of recognised texts : {str(len(match))}</p>")
         html_file.write(f"<h2>Text du volume</h2><p>{text_volume}</p>")
         html_file.write("</body></html>")
 
@@ -157,11 +176,19 @@ def main():
         required=True,
         type=Path,
     )
+    parser.add_argument("--output-html", required=True, type=Path)
     parser.add_argument(
         "--output-html",
         required=True,
         type=Path,
         help="Path where the html will be located, please be sure to put the css in the same folder",
+    )
+    parser.add_argument(
+        "--normalize",
+        help="Turn j into i, v into u",
+        default="True",
+        required=False,
+        action="store_true",
     )
 
     args = vars(parser.parse_args())
@@ -179,6 +206,25 @@ def main():
         str(args["metadata"]),
         PurePosixPath(args["output_html"]),
     )
+
+    # Normalize the text before application of the interface
+    if args["normalize"].lower():
+        interface(
+            args["input_txt"],
+            PurePosixPath(args["input_folder"]).as_posix(),
+            args["metadata"],
+            args["output_html"],
+            True,
+        )
+        logging.info("normalization done")
+    else:
+        interface(
+            args["input_txt"],
+            PurePosixPath(args["input_folder"]).as_posix(),
+            args["metadata"],
+            args["output_html"],
+            False,
+        )
 
 
 if __name__ == "__main__":
