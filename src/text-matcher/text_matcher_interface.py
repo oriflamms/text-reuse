@@ -115,7 +115,7 @@ def interface(txt1, txt2, metadata_path, html_path, normalize):
 
         for row in data:
             if row[0] == psalm_id:
-                id_arkindex = row[0]
+                # id_arkindex = row[0]
                 psalm_name = row[1]
                 work_id = row[2]
 
@@ -134,7 +134,7 @@ def interface(txt1, txt2, metadata_path, html_path, normalize):
         )
 
         # Adding it in the evaluation dataframe
-        df.loc[volume_id, id_arkindex] = 1
+        df.loc[volume_id, psalm_name] = 1
 
     # Open and write in the html
     with open(html_path, "w") as html_file:
@@ -174,7 +174,8 @@ def create_html(volume_folder, reference_folder, metadata, save_path):
 
     # Creation of the column for the evaluation df
     df = pd.read_csv(metadata)
-    columns = df["ID Arkindex"].to_numpy()
+    # columns = df["ID Arkindex"].to_numpy()
+    columns = df["ID Annotation"].to_numpy()
     logging.info(columns)
 
     # Creation if the index for the evaluation df
@@ -191,6 +192,13 @@ def create_html(volume_folder, reference_folder, metadata, save_path):
         volume_path = os.path.join(save_path, volume_html)
         interface(str(filename), str(reference_folder), metadata, volume_path, df)
 
+    new_column = []
+    for i in df.columns:
+        new_column.append(str(i).split()[-1])
+        # print(str(i).split()[-1])
+
+    df = df.set_axis(new_column, axis="columns")
+
     df.to_csv(os.path.join(save_path, "evaluation_df.csv"), index=True)
 
 
@@ -205,10 +213,10 @@ def main():
         help="Path of the text of interest",
     )
     parser.add_argument(
-        "--input-htmls",
+        "--input-folder",
         required=True,
         type=Path,
-        help="Path of the htmls of the text of reference",
+        help="Path of the folder of the text of reference",
     )
     parser.add_argument(
         "--metadata",

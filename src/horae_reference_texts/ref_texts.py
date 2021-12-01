@@ -63,7 +63,7 @@ class ReferenceTexts:
         self.df_text["clean_text"] = self.df_text["Text"].apply(clean_text)
 
     def write_in_txt(self, output_path):
-        """Write in txt file the clean text for each psalm's text in a folder"""
+        """Write in txt file the clean text for each psalm's text in a htmls"""
         for index, row in self.df_text.iterrows():
             with open(
                 os.path.join(output_path, f'{row["ID Arkindex"]}.txt'),
@@ -189,4 +189,4 @@ def main():
 if __name__ == "__main__":
     main()
     # test = ReferenceTexts("Export_stutzmann_horae_t65_Work.csv", "Psalm")
-    # test.write_metadata("folder/")
+    # test.write_metadata("htmls/")

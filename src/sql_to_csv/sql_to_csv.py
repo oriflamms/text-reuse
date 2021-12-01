@@ -179,7 +179,7 @@ class SqlToCsv:
     def get_all_text_segment_psalm(self, liturgical_function):
         # Get the name of text segment with that are Psalm
         self.cursor.execute(
-            f"select id from element where id in (select child_id from element_path where parent_id in (select child_id from element_path where parent_id in (select id from element where type='volume'))) and type = 'text_segment' and name like '%{liturgical_function}%' group by name;"
+            f"select name from element where id in (select child_id from element_path where parent_id in (select child_id from element_path where parent_id in (select id from element where type='volume'))) and type = 'text_segment' and name like '%{liturgical_function}%' group by name;"
         )
         columns = []
         index = []
@@ -195,18 +195,39 @@ class SqlToCsv:
         for index, row in df.iterrows():
             # Find text segment for each volume
             self.cursor.execute(
-                f"select id from element where id in (select child_id from element_path where parent_id in (select child_id from element_path where parent_id = '{index}')) and type = 'text_segment' and name like '%{liturgical_function}%';"
+                f"select name from element where id in (select child_id from element_path where parent_id in (select child_id from element_path where parent_id = '{index}')) and type = 'text_segment' and name like '%{liturgical_function}%';"
             )
             for i in self.cursor.fetchall():
                 if i[0] in df.columns:
                     row[i[0]] = 1
+
+        new_column = []
+        for i in df.columns:
+            new_column.append(str(i).split()[-1])
+            # print(str(i).split()[-1])
+
+        df = df.set_axis(new_column, axis="columns")
+
+        # Read metadata
+        #        with open(metadata, newline="") as meta_file:
+        #            data = list(csv.reader(meta_file, delimiter=","))
+
+        # Create list of new name
+        #        new_name = []
+        #        for col in df.columns:
+        #            for row in data:
+        #                if col == row[1]:
+        #                    new_name.append(row[0])
+
+        # Replace the column name with new_name
+        #        df = df.set_axis(new_name, axis='columns')
 
         # Extract the dataframe as a csv
         df.to_csv(
             os.path.join(self.output_path, "50mms_text_segment.csv"),
             index=True,
         )
-        # os.path.join(self.output_path, '50mms_text_segment.csv')
+        # os.path.join(self.output_path, 'name_50mms_text_segment.csv')
 
 
 def main():
@@ -243,6 +264,13 @@ def main():
         required=False,
         default="",
     )
+    """
+    parser.add_argument(
+        "--metadata",
+        type=Path,
+        required=True,
+        help="Path of the metadata file with id arkindex in first column and the name of the prayer in the second"
+    )"""
 
     args = vars(parser.parse_args())
 
