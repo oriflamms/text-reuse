@@ -176,6 +176,38 @@ class SqlToCsv:
             transcription = [phrase[0].replace("\n", " ") for phrase in transcription]
         return "".join(transcription)
 
+    def get_all_text_segment_psalm(self, liturgical_function):
+        # Get the name of text segment with that are Psalm
+        self.cursor.execute(
+            f"select id from element where id in (select child_id from element_path where parent_id in (select child_id from element_path where parent_id in (select id from element where type='volume'))) and type = 'text_segment' and name like '%{liturgical_function}%' group by name;"
+        )
+        columns = []
+        index = []
+        # create an array with the good name for index and column
+        for i in self.cursor.fetchall():
+            columns.append(i[0])
+        for i in self.get_list_book():
+            index.append(i[0])
+        # Creation of the dataframe filled with 0 and with the id of volume as row and the name of text segment as column
+        df = pd.DataFrame(0, columns=columns, index=index)
+
+        # Put a 1 in the dataframe if the volume contain the text segment
+        for index, row in df.iterrows():
+            # Find text segment for each volume
+            self.cursor.execute(
+                f"select id from element where id in (select child_id from element_path where parent_id in (select child_id from element_path where parent_id = '{index}')) and type = 'text_segment' and name like '%{liturgical_function}%';"
+            )
+            for i in self.cursor.fetchall():
+                if i[0] in df.columns:
+                    row[i[0]] = 1
+
+        # Extract the dataframe as a csv
+        df.to_csv(
+            os.path.join(self.output_path, "50mms_text_segment.csv"),
+            index=True,
+        )
+        # os.path.join(self.output_path, '50mms_text_segment.csv')
+
 
 def main():
     """Collect arguments and run."""
@@ -199,6 +231,18 @@ def main():
         help="choose between an export in csv or in txt",
         required=True,
     )
+    parser.add_argument(
+        "--text-segment",
+        required=False,
+        help="Export a csv called 50mss_text_segment.csv with information of what volume contains what text segment (y/n)",
+        default="n",
+    )
+    parser.add_argument(
+        "--liturgical-function",
+        help="specifies the liturgical function of the reference's text. Case sensitive",
+        required=False,
+        default="",
+    )
 
     args = vars(parser.parse_args())
 
@@ -207,6 +251,8 @@ def main():
             f.save_all_books()
         elif args["output_format"] == "txt":
             f.save_all_book_as_txt()
+        if args["text_segment"] == "y":
+            f.get_all_text_segment_psalm(args["liturgical_function"])
 
 
 if __name__ == "__main__":

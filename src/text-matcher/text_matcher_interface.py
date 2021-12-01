@@ -109,12 +109,13 @@ def interface(txt1, txt2, metadata_path, html_path, normalize):
             if normalize:
                 psalm_text = normalize_txt(psalm_text)
 
-        # Fetch psalm id from input folder to create heurist link
+        # Fetch psalm id from input htmls to create heurist link
         psalm_id = os.path.basename(i[0])
         psalm_id = psalm_id.replace(".txt", "")
 
         for row in data:
             if row[0] == psalm_id:
+                id_arkindex = row[0]
                 psalm_name = row[1]
                 work_id = row[2]
 
@@ -133,7 +134,7 @@ def interface(txt1, txt2, metadata_path, html_path, normalize):
         )
 
         # Adding it in the evaluation dataframe
-        df.loc[volume_id, int(work_id)] = 1
+        df.loc[volume_id, id_arkindex] = 1
 
     # Open and write in the html
     with open(html_path, "w") as html_file:
@@ -168,12 +169,12 @@ def create_df(metadata, volume_folder, save_path):
 
 
 def create_html(volume_folder, reference_folder, metadata, save_path):
-    # Get the path of the text in the folder
+    # Get the path of the text in the htmls
     texts = getFiles(volume_folder)
 
     # Creation of the column for the evaluation df
     df = pd.read_csv(metadata)
-    columns = df["Work H-ID"].to_numpy()
+    columns = df["ID Arkindex"].to_numpy()
     logging.info(columns)
 
     # Creation if the index for the evaluation df
@@ -204,10 +205,10 @@ def main():
         help="Path of the text of interest",
     )
     parser.add_argument(
-        "--input-folder",
+        "--input-htmls",
         required=True,
         type=Path,
-        help="Path of the folder of the text of reference",
+        help="Path of the htmls of the text of reference",
     )
     parser.add_argument(
         "--metadata",
@@ -220,7 +221,7 @@ def main():
         "--output-html",
         required=True,
         type=Path,
-        help="Path where the html will be located, please be sure to put the css in the same folder",
+        help="Path where the html will be located, please be sure to put the css in the same htmls",
     )
     parser.add_argument(
         "--normalize",
