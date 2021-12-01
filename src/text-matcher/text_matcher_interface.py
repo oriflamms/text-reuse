@@ -133,7 +133,7 @@ def interface(txt1, txt2, metadata_path, html_path, normalize):
         )
 
         # Adding it in the evaluation dataframe
-        df.loc[volume_id, psalm_name] = 1
+        df.loc[volume_id, int(work_id)] = 1
 
     # Open and write in the html
     with open(html_path, "w") as html_file:
@@ -173,7 +173,7 @@ def create_html(volume_folder, reference_folder, metadata, save_path):
 
     # Creation of the column for the evaluation df
     df = pd.read_csv(metadata)
-    columns = df["ID Annotation"].to_numpy()
+    columns = df["Work H-ID"].to_numpy()
     logging.info(columns)
 
     # Creation if the index for the evaluation df
