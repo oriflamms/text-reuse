@@ -6,6 +6,7 @@ At this moment there are three features in the code:
 * ref-texts: statistics on reference texts and file export
 * sql-to-csv : sql database processing and export
 * text-matcher : comparisons between two entities with details
+* text-eval : evaluate the matcher
 
 ## Usage
 ### Installation
@@ -47,3 +48,12 @@ A normalisation of the text will be done automatically, if you don't want it set
 
 Example of line commands :
 * `python src/text-matcher/text_matcher_interface.py --input-txt tests/data/test_volume/0a7da4a2-23ad-4d97-a868-c2960f1f0d2a.txt --input-folder tests/data/test_psaume/ --metadata tests/data/metadata.csv --output-html src/text-matcher/interface.html`
+
+
+### text_eval
+In command line you can fill a csv with predictions and a csv with the real values to have the precision and the recall of the text-matcher
+Works with the matching of h_tag at the end of the name of prayer
+
+Example of lign commands :
+* `python src/evaluation/text_eval.py --pred-file tests/data/h_evaluation_df.csv --true-file tests/data/h_50mms_text_segment.csv`
+
