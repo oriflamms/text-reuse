@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import argparse
+import warnings
 from pathlib import Path
+
 import pandas as pd
 from sklearn.metrics import classification_report
-import warnings
-warnings.filterwarnings('ignore')
+
+warnings.filterwarnings("ignore")
 
 
 def evaluation(pred_file, true_file):
@@ -35,24 +37,17 @@ def evaluation(pred_file, true_file):
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Evaluate text-matcher for two file"
+    parser = argparse.ArgumentParser(description="Evaluate text-matcher for two file")
+    parser.add_argument(
+        "--pred-file", type=Path, required=True, help="Path of the csv with prediction"
     )
     parser.add_argument(
-        "--pred-file",
-        type=Path,
-        required=True,
-        help="Path of the csv with prediction"
-    )
-    parser.add_argument(
-        "--true-file",
-        type=Path,
-        required=True,
-        help="Path of the csv with true value"
+        "--true-file", type=Path, required=True, help="Path of the csv with true value"
     )
 
     args = vars(parser.parse_args())
 
+    # evaluate the matcher
     evaluation(args["pred_file"], args["true_file"])
 
 
