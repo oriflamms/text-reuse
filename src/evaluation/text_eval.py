@@ -54,7 +54,9 @@ def evaluation(pred_file, true_file):
         print(classification_report(row, new_df_pred.loc[index]))
 
     print("The classification report upon the whole dataframe")
-    print(classification_report(new_df_true, new_df_pred))
+    print(classification_report(new_df_true, new_df_pred, target_names=list_columns))
+
+    # print(classification_report(y_true, y_pred, target_names=target_names))
 
     # confusion matrix
     print(multilabel_confusion_matrix(new_df_true, new_df_pred))

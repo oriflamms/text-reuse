@@ -19,11 +19,16 @@ HEURIST_TEXT_URL = "https://heurist.huma-num.fr/heurist/hclient/framecontent/rec
 def normalize_txt(txt):
     txt = txt.replace("\xa0", " ")
     txt = txt.replace("j", "i")
+    txt = txt.replace("J", "I")
     txt = "".join(txt)
     txt = txt.replace("v", "u")
+    txt = txt.replace("V", "U")
     txt = txt.replace("ë", "e")
+    txt = txt.replace("Ë", "E")
     txt = txt.replace("æ", "e")
+    txt = txt.replace("Æ", "E")
     txt = txt.replace("œ", "e")
+    txt = txt.replace("Œ", "E")
     logging.info("normalization done")
     return txt
 
