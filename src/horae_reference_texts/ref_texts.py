@@ -188,5 +188,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    # test = ReferenceTexts("Export_stutzmann_horae_t65_Work.csv", "Psalm")
-    # test.write_metadata("htmls/")

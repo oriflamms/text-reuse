@@ -65,13 +65,58 @@ class SqlToCsv:
         df = pd.DataFrame(self.cursor.fetchall(), columns=["text"])
         return self.get_transcription_df_single_page(df)
 
+    def get_transcription_double_page(self, page_id):
+        """Get the transcription on a double page with the paragraph in order"""
+        self.cursor.execute(
+            f"select text, sel.polygon from transcription inner join (select id, polygon from element where id in (select child_id from element_path where parent_id='{page_id}')and type='paragraph' order by polygon) as sel on transcription.element_id=sel.id"
+        )
+        df = pd.DataFrame(self.cursor.fetchall(), columns=["text", "polygon"])
+        # df.to_csv(os.path.join(self.output_path, f"aaa{page_id}.csv"))
+
+        return self.get_transcription_double_page_df(df)
+
     @staticmethod
     def get_transcription_df_single_page(df):
+        """Extract the transcription for single page"""
         transcription = ""
         for index, row in df.iterrows():
             transcription += row["text"] + " "
         transcription = [phrase[0].replace("\n", " ") for phrase in transcription]
         return "".join(transcription)
+
+    @staticmethod
+    def get_transcription_double_page_df(df):
+        """Extract the transcription for double page"""
+        df["polygon"] = df.polygon.apply(lambda x: Polygon(ast.literal_eval(str(x))))
+        df["x_axis"] = df.polygon.apply(lambda a: a.centroid.x)  # order on which page
+        df["y_axis"] = df.polygon.apply(
+            lambda a: a.centroid.y
+        )  # order where on the page
+        transcription = ""
+
+        # Check if the dataframe is empty else return empty string
+        if len(df.index) != 0:
+            # Create a limit between the pages
+            df = df.sort_values(by=["y_axis"])
+            stat = df["x_axis"].describe()
+            x_limit = (stat[4] + stat[7]) / 2
+
+            # Get the transcription
+            for i in [0, 1]:
+                for index, row in df.iterrows():
+                    if i == 0 and row["x_axis"] < x_limit:
+                        transcription += row["text"] + " "
+                    if i == 1 and row["x_axis"] > x_limit:
+                        transcription += row["text"] + " "
+            transcription = [phrase[0].replace("\n", " ") for phrase in transcription]
+        return "".join(transcription)
+
+    def check_type_page_from_book_id(self, book_id):
+        """Check the type of the page to apply the right get_transcription algorithm"""
+        self.cursor.execute(
+            f"select class_name from classification where element_id = '{book_id}'"
+        )
+        return self.cursor.fetchall()[0][0]
 
     def save_book_as_csv(self, book_id):
         """Save the book (page id and transcription) in a csv"""
@@ -133,50 +178,11 @@ class SqlToCsv:
                     file.write(trans)
                 # logging.info(str(type_page))
 
-    def check_type_page_from_book_id(self, book_id):
-        """Check the type of the page to apply the right get_transcription algorithm"""
-        self.cursor.execute(
-            f"select class_name from classification where element_id = '{book_id}'"
-        )
-        return self.cursor.fetchall()[0][0]
-
-    def get_transcription_double_page(self, page_id):
-        """Get the transcription on a double page with the paragraph in order"""
-        self.cursor.execute(
-            f"select text, sel.polygon from transcription inner join (select id, polygon from element where id in (select child_id from element_path where parent_id='{page_id}')and type='paragraph' order by polygon) as sel on transcription.element_id=sel.id"
-        )
-        df = pd.DataFrame(self.cursor.fetchall(), columns=["text", "polygon"])
-        # df.to_csv(os.path.join(self.output_path, f"aaa{page_id}.csv"))
-
-        return self.get_transcription_double_page_df(df)
-
-    @staticmethod
-    def get_transcription_double_page_df(df):
-        """Extract the transcription from data"""
-        df["polygon"] = df.polygon.apply(lambda x: Polygon(ast.literal_eval(str(x))))
-        df["x_axis"] = df.polygon.apply(lambda a: a.centroid.x)  # order on which page
-        df["y_axis"] = df.polygon.apply(
-            lambda a: a.centroid.y
-        )  # order where on the page
-        transcription = ""
-        # Check if the dataframe is empty else return empty string
-        if len(df.index) != 0:
-            # Create a limit between the pages
-            df = df.sort_values(by=["y_axis"])
-            stat = df["x_axis"].describe()
-            x_limit = (stat[4] + stat[7]) / 2
-
-            # Get the transcription
-            for i in [0, 1]:
-                for index, row in df.iterrows():
-                    if i == 0 and row["x_axis"] < x_limit:
-                        transcription += row["text"] + " "
-                    if i == 1 and row["x_axis"] > x_limit:
-                        transcription += row["text"] + " "
-            transcription = [phrase[0].replace("\n", " ") for phrase in transcription]
-        return "".join(transcription)
-
     def get_all_text_segment_psalm(self, liturgical_function):
+        """
+        Return a csv with all correspondence between a volume and the text of the liturgical function that can be found
+        inside
+        """
         # Get the name of text segment with that are Psalm
         self.cursor.execute(
             f"select name from element where id in (select child_id from element_path where parent_id in (select child_id from element_path where parent_id in (select id from element where type='volume'))) and type = 'text_segment' and name like '%{liturgical_function}%' group by name;"
@@ -188,6 +194,7 @@ class SqlToCsv:
             columns.append(i[0])
         for i in self.get_list_book():
             index.append(i[0])
+
         # Creation of the dataframe filled with 0 and with the id of volume as row and the name of text segment as column
         df = pd.DataFrame(0, columns=columns, index=index)
 
@@ -208,26 +215,11 @@ class SqlToCsv:
 
         df = df.set_axis(new_column, axis="columns")
 
-        # Read metadata
-        #        with open(metadata, newline="") as meta_file:
-        #            data = list(csv.reader(meta_file, delimiter=","))
-
-        # Create list of new name
-        #        new_name = []
-        #        for col in df.columns:
-        #            for row in data:
-        #                if col == row[1]:
-        #                    new_name.append(row[0])
-
-        # Replace the column name with new_name
-        #        df = df.set_axis(new_name, axis='columns')
-
         # Extract the dataframe as a csv
         df.to_csv(
             os.path.join(self.output_path, "50mms_text_segment.csv"),
             index=True,
         )
-        # os.path.join(self.output_path, 'name_50mms_text_segment.csv')
 
 
 def main():
@@ -264,21 +256,17 @@ def main():
         required=False,
         default="",
     )
-    """
-    parser.add_argument(
-        "--metadata",
-        type=Path,
-        required=True,
-        help="Path of the metadata file with id arkindex in first column and the name of the prayer in the second"
-    )"""
 
     args = vars(parser.parse_args())
 
     with SqlToCsv(args["file"], args["savefile"]) as f:
+        # Save the book in csv format in the folder specified
         if args["output_format"] == "csv":
             f.save_all_books()
+        # Save the book in txt format in the folder specified
         elif args["output_format"] == "txt":
             f.save_all_book_as_txt()
+        # Save the csv of correspondence between volumes and the text specified
         if args["text_segment"] == "y":
             f.get_all_text_segment_psalm(args["liturgical_function"])
 

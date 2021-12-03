@@ -20,7 +20,10 @@ def normalize_txt(txt):
     txt = txt.replace("\xa0", " ")
     txt = txt.replace("j", "i")
     txt = "".join(txt)
-    txt = txt.replace("u", "v")
+    txt = txt.replace("v", "u")
+    txt = txt.replace("ë", "e")
+    txt = txt.replace("æ", "e")
+    txt = txt.replace("œ", "e")
     logging.info("normalization done")
     return txt
 
@@ -43,7 +46,7 @@ def getting_info(text1, text2, threshold, cutoff, ngrams, stops, normalize):
     for index, pair in enumerate(pairs):
         filenameA, filenameB = pair[0], pair[1]
 
-        # Put this in a dictionary so we don't have to process a file twice.
+        # Put this in a dictionary, so we don't have to process a file twice.
         for filename in [filenameA, filenameB]:
             if filename not in prevTextObjs:
                 if normalize:
@@ -79,7 +82,7 @@ def getting_info(text1, text2, threshold, cutoff, ngrams, stops, normalize):
 
 
 
-def interface(txt1, txt2, metadata_path, html_path, normalize):
+def interface(txt1, txt2, metadata_path, html_path, df, normalize):
     # Prepare the list of match
     match = getting_info(txt1, txt2, 3, 5, 3, False, normalize)
     # Ordering the list of match by order of apparition in the text
@@ -87,7 +90,8 @@ def interface(txt1, txt2, metadata_path, html_path, normalize):
 
     # Read the text of the volume
     with open(txt1, "r") as text_of_interest_file:
-        text_volume = text_of_interest_file.read()
+
+        text_volume = normalize_txt(text_of_interest_file.read())
         if normalize:
             text_volume = normalize_txt(text_volume)
 
@@ -150,25 +154,7 @@ def interface(txt1, txt2, metadata_path, html_path, normalize):
         html_file.write("</body></html>")
 
 
-# A supprimé plus tard
-def create_df(metadata, volume_folder, save_path):
-    texts = getFiles(volume_folder)
-    index = []
-    for filename in texts:
-        index.append(os.path.basename(filename).replace(".txt", ""))
-
-    df = pd.read_csv(metadata)
-    columns = df["ID Annotation"].to_numpy()
-
-    df = pd.DataFrame(0, columns=columns, index=index)
-    # logging.info(df)
-
-    # CSV de test vouer à disparaitre
-    df.to_csv(os.path.join(save_path, "pouet.csv"), index=True)
-    return df
-
-
-def create_html(volume_folder, reference_folder, metadata, save_path):
+def create_html(volume_folder, reference_folder, metadata, save_path, normalize):
     # Get the path of the text in the htmls
     texts = getFiles(volume_folder)
 
@@ -186,19 +172,23 @@ def create_html(volume_folder, reference_folder, metadata, save_path):
     # Creation of the df
     df = pd.DataFrame(0, columns=columns, index=index)
 
+    # Go through the volumes and apply text-matcher to them while creating html
     for filename in texts:
         volume_id = os.path.basename(filename)
         volume_html = volume_id.replace(".txt", ".html")
         volume_path = os.path.join(save_path, volume_html)
-        interface(str(filename), str(reference_folder), metadata, volume_path, df)
+        interface(
+            str(filename), str(reference_folder), metadata, volume_path, df, normalize
+        )
 
+    # Give proper name with h_tag to the column of the df
     new_column = []
     for i in df.columns:
         new_column.append(str(i).split()[-1])
-        # print(str(i).split()[-1])
 
     df = df.set_axis(new_column, axis="columns")
 
+    # Export the dataframe with a csv format
     df.to_csv(os.path.join(save_path, "evaluation_df.csv"), index=True)
 
 
@@ -207,13 +197,13 @@ def main():
         description="Take a text and a repertory of text and find correspondence",
     )
     parser.add_argument(
-        "--input-txt",
+        "--input-volumes",
         required=True,
         type=Path,
         help="Path of the text of interest",
     )
     parser.add_argument(
-        "--input-folder",
+        "--input-references",
         required=True,
         type=Path,
         help="Path of the folder of the text of reference",
@@ -241,36 +231,22 @@ def main():
 
     args = vars(parser.parse_args())
 
-    """
-    interface(
-        args["input_txt"],
-        PurePosixPath(args["input_folder"]).as_posix(),
-        args["metadata"],
-        args["output_html"],
-    )"""
-    create_html(
-        PurePosixPath(args["input_txt"]).as_posix(),
-        PurePosixPath(args["input_folder"]),
-        str(args["metadata"]),
-        PurePosixPath(args["output_html"]),
-    )
-
     # Normalize the text before application of the interface
-    if args["normalize"].lower():
-        interface(
-            args["input_txt"],
-            PurePosixPath(args["input_folder"]).as_posix(),
-            args["metadata"],
-            args["output_html"],
+    if args["normalize"]:
+        create_html(
+            PurePosixPath(args["input_volumes"]).as_posix(),
+            PurePosixPath(args["input_references"]),
+            str(args["metadata"]),
+            PurePosixPath(args["output_html"]),
             True,
         )
         logging.info("normalization done")
     else:
-        interface(
-            args["input_txt"],
-            PurePosixPath(args["input_folder"]).as_posix(),
-            args["metadata"],
-            args["output_html"],
+        create_html(
+            PurePosixPath(args["input_volumes"]).as_posix(),
+            PurePosixPath(args["input_references"]),
+            str(args["metadata"]),
+            PurePosixPath(args["output_html"]),
             False,
         )
 
