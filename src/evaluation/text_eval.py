@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import argparse
+import os
 import warnings
 from pathlib import Path
 
 import pandas as pd
-from sklearn.metrics import classification_report, multilabel_confusion_matrix
+from sklearn.metrics import classification_report
 
 warnings.filterwarnings("ignore")
 
@@ -28,7 +29,7 @@ def count_the_match(pred_file, true_file):
     print(list_columns)
 
 
-def evaluation(pred_file, true_file):
+def evaluation(pred_file, true_file, metadata, output_path):
     """Evaluate the precision and the recall between the prediction and the true file"""
     # read csv and order the row
     df_pred = pd.read_csv(pred_file, index_col=0)
@@ -48,33 +49,75 @@ def evaluation(pred_file, true_file):
     new_df_true = df_true[list_columns]
     new_df_pred = df_pred[list_columns]
 
+    # new column name
+    meta = pd.read_csv(metadata)
+    list_col = meta["ID Annotation"].to_numpy()
+    new_name = []
+    for name in list_col:
+        new_name.append(" ".join(name.split()[-6:]))
+
+    list_new_col = []
+    for col in list_columns:
+        for i in new_name:
+            if i.split()[-1] == col:
+                list_new_col.append(i)
+
+    new_df_true = new_df_true.set_axis(list_new_col, axis="columns")
+    new_df_pred = new_df_pred.set_axis(list_new_col, axis="columns")
+
     # apply classification report
     for index, row in new_df_true.iterrows():
         print(f"For volume_id {index}")
         print(classification_report(row, new_df_pred.loc[index]))
 
     print("The classification report upon the whole dataframe")
-    print(classification_report(new_df_true, new_df_pred, target_names=list_columns))
+    print(classification_report(new_df_true, new_df_pred, target_names=list_new_col))
 
-    # print(classification_report(y_true, y_pred, target_names=target_names))
+    # Adding a line for the total
+    df_new = pd.DataFrame(0, columns=list_new_col, index=["Total"])
+    new_df_true = new_df_true.append(df_new, ignore_index=False)
+    new_df_pred = new_df_pred.append(df_new, ignore_index=False)
+    for col in list_new_col:
+        new_df_true.loc["Total", col] = new_df_true[col].sum()
+        new_df_pred.loc["Total", col] = new_df_pred[col].sum()
 
-    # confusion matrix
-    print(multilabel_confusion_matrix(new_df_true, new_df_pred))
+    new_df_true.to_csv(os.path.join(output_path, "result_pred.csv"), index=True)
+    new_df_true.to_csv(os.path.join(output_path, "result_true.csv"), index=True)
 
 
 def main():
     parser = argparse.ArgumentParser(description="Evaluate text-matcher for two file")
     parser.add_argument(
-        "--pred-file", type=Path, required=True, help="Path of the csv with prediction"
+        "--pred-file",
+        type=Path,
+        required=True,
+        help="Path of the csv with prediction",
     )
     parser.add_argument(
-        "--true-file", type=Path, required=True, help="Path of the csv with true value"
+        "--true-file",
+        type=Path,
+        required=True,
+        help="Path of the csv with true value",
+    )
+    parser.add_argument(
+        "--metadata",
+        type=Path,
+        required=True,
+        help="Path of the metadata file",
+    )
+    parser.add_argument(
+        "--output-path",
+        type=Path,
+        required=True,
+        help="Path where the output will be generated",
     )
 
     args = vars(parser.parse_args())
 
     # evaluate the matcher
-    evaluation(args["pred_file"], args["true_file"])
+    evaluation(
+        args["pred_file"], args["true_file"], args["metadata"], args["output_path"]
+    )
 
     # Count the match between the column of the dataframe
     # count_the_match(args["pred_file"], args["true_file"])
