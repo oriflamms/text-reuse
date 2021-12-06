@@ -251,6 +251,12 @@ def main():
         default="n",
     )
     parser.add_argument(
+        "--bio",
+        help="Extraction of the name with bio format",
+        required=False,
+        default="n",
+    )
+    parser.add_argument(
         "--liturgical-function",
         help="specifies the liturgical function of the reference's text. Case sensitive",
         required=False,
@@ -269,6 +275,8 @@ def main():
         # Save the csv of correspondence between volumes and the text specified
         if args["text_segment"] == "y":
             f.get_all_text_segment_psalm(args["liturgical_function"])
+        if args["bio"] == "y":
+            f.bio_extraction_name(args["liturgical_function"])
 
 
 if __name__ == "__main__":
