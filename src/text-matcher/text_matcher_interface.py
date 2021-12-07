@@ -15,6 +15,7 @@ from text_matcher.text_matcher import getFiles
 ARKINDEX_VOLUME_URL = "https://arkindex.teklia.com/element/"
 HEURIST_TEXT_URL = "https://heurist.huma-num.fr/heurist/hclient/framecontent/recordEdit.php?db=stutzmann_horae&recID="
 
+
 def normalize_txt(txt):
     txt = txt.replace("\xa0", " ")
     txt = txt.replace("j", "i")
@@ -83,7 +84,6 @@ def getting_info(text1, text2, threshold, cutoff, ngrams, stops, normalize):
         if myMatch.numMatches > 0:
             list_object.append([pair[1], myMatch.locationsA, myMatch.locationsB])
     return list_object
-
 
 
 def interface(txt1, txt2, metadata_path, html_path, df, normalize):
