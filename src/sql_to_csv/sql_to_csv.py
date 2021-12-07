@@ -221,6 +221,16 @@ class SqlToCsv:
             index=True,
         )
 
+    def get_meta_vol(self):
+        self.cursor.execute("select id, name from element where type = 'volume'")
+        df_vol = pd.DataFrame.from_records(
+            data=self.cursor.fetchall(), columns=["id", "name"]
+        )
+        df_vol.to_csv(
+            os.path.join(self.output_path, "metadata_volume.csv"),
+            index=False,
+        )
+
 
 def main():
     """Collect arguments and run."""
@@ -228,13 +238,13 @@ def main():
         description="Take a sql file and return csv (default) or txt by file of the books",
     )
     parser.add_argument(
-        "--file",
+        "--file-sql",
         help="path of the sqlite db",
         required=True,
         type=Path,
     )
     parser.add_argument(
-        "--savefile",
+        "--savefile-path",
         help="path where the files will be created",
         required=True,
         type=Path,
@@ -251,21 +261,21 @@ def main():
         default="n",
     )
     parser.add_argument(
-        "--bio",
-        help="Extraction of the name with bio format",
-        required=False,
-        default="n",
-    )
-    parser.add_argument(
         "--liturgical-function",
         help="specifies the liturgical function of the reference's text. Case sensitive",
         required=False,
         default="",
     )
+    parser.add_argument(
+        "--gen-meta-vol",
+        required=False,
+        default="n",
+        help="Generate a metadata file with id of volume and name",
+    )
 
     args = vars(parser.parse_args())
 
-    with SqlToCsv(args["file"], args["savefile"]) as f:
+    with SqlToCsv(args["file_sql"], args["savefile_path"]) as f:
         # Save the book in csv format in the folder specified
         if args["output_format"] == "csv":
             f.save_all_books()
@@ -275,8 +285,8 @@ def main():
         # Save the csv of correspondence between volumes and the text specified
         if args["text_segment"] == "y":
             f.get_all_text_segment_psalm(args["liturgical_function"])
-        if args["bio"] == "y":
-            f.bio_extraction_name(args["liturgical_function"])
+        if args["gen_meta_vol"] == "y":
+            f.get_meta_vol()
 
 
 if __name__ == "__main__":

@@ -214,7 +214,7 @@ def main():
         help="Path of the folder of the text of reference",
     )
     parser.add_argument(
-        "--metadata",
+        "--metadata-heurist",
         help="File with the metadata to indicate the name of the recognised text",
         required=True,
         type=Path,

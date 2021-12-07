@@ -23,10 +23,10 @@ You can also extract the metadata in a csv which contain the Arkindex ID and the
 
 Example of line commands :
 * Only the stats : `python src/horae_reference_texts/ref_texts.py --file tests/data/Export_stutzmann_horae_t65_Work.csv`
-* Only the stats with a specification on the liturgical function: `python src/horae_reference_texts/ref_texts.py --file tests/data/Export_stutzmann_horae_t65_Work.csv --liturgical-function Psalm`
-* Stats and output in txt format : `python src/horae_reference_texts/ref_texts.py --file tests/data/test_export_heurist_horae.csv --text-path folder/`
-* Stats and metadata file in csv format : `python src/horae_reference_texts/ref_texts.py --file tests/data/Export_stutzmann_horae_t65_Work.csv --metadata-path folder/`
-* Stats, metadata and output in txt file : `python src/horae_reference_texts/ref_texts.py --file tests/data/Export_stutzmann_horae_t65_Work.csv --metadata-path folder/ --text-path folder/`
+* Only the stats with a specification on the liturgical function: `python src/horae_reference_texts/ref_texts.py --file-heurist tests/data/Export_stutzmann_horae_t65_Work.csv --liturgical-function Psalm`
+* Stats and output in txt format : `python src/horae_reference_texts/ref_texts.py --file-heurist tests/data/Export_stutzmann_horae_t65_Work.csv --text-path folder/`
+* Stats and metadata file in csv format : `python src/horae_reference_texts/ref_texts.py --file-heurist tests/data/Export_stutzmann_horae_t65_Work.csv --metadata-path folder/`
+* Stats, metadata and output in txt file : `python src/horae_reference_texts/ref_texts.py --file-heurist tests/data/Export_stutzmann_horae_t65_Work.csv --metadata-path folder/ --text-path folder/`
 
 
 ### sql-to-csv
@@ -38,7 +38,8 @@ The file fill be named after the ID of the book and will be constructed :
 Example of line commands :
 * In txt : `python src/sql_to_csv/sql_to_csv.py --file tests/data/horae-50-mss-ml-20211116-121450.sqlite --savefile folder/ --output-format txt`
 * In csv : `python src/sql_to_csv/sql_to_csv.py --file tests/data/horae-50-mss-ml-20211116-121450.sqlite --savefile folder/ --output-format csv`
-
+* Export text-segment with liturgical function : `python src/sql_to_csv/sql_to_csv.py --file-sql tests/data/horae-50-mss-ml-20211116-121450.sqlite --savefile-path folder/ --output-format txt --text-segment y --liturgical-function Psalm`
+* Export metadata on volume : `python src/sql_to_csv/sql_to_csv.py --file-sql tests/data/horae-50-mss-ml-20211116-121450.sqlite --savefile-path folder/ --output-format txt --gen-meta-vol y`
 
 ### text-matcher
 In command line you can have information on the matches of an input volume and input folder of reference texts.
@@ -52,8 +53,9 @@ Example of line commands :
 
 ### text_eval
 In command line you can fill a csv with predictions and a csv with the real values to have the precision and the recall of the text-matcher
-Works with the matching of h_tag at the end of the name of prayer
+Works with the matching of h_tag at the end of the name of prayer.
+Generate the csv of data with the sum of each text found in the file.
 
 Example of lign commands :
-* `python src/evaluation/text_eval.py --pred-file tests/data/h_evaluation_df.csv --true-file tests/data/h_50mms_text_segment.csv`
+* `python src/evaluation/text_eval.py --pred-file tests/data/h_evaluation_df.csv --true-file tests/data/h_50mms_text_segment.csv --metadata-heurist tests/data/metadata_heurist.csv --metadata-volume tests/data/metadata_volume.csv --output-path folder/`
 

@@ -75,7 +75,7 @@ class ReferenceTexts:
     def write_metadata(self, metadata_path):
         df_meta = self.df[self.df["Liturgical function"] == self.liturgical_function]
         df_meta[["ID Arkindex", "ID Annotation", "Work H-ID"]].to_csv(
-            os.path.join(metadata_path, "metadata.csv"), index=False
+            os.path.join(metadata_path, "metadata_heurist.csv"), index=False
         )
         # print(df_meta[["ID Arkindex", "ID Annotation", "Work H-ID"]].size)
 
@@ -149,8 +149,8 @@ def main():
         description="Parse a heurist export and make stats",
     )
     parser.add_argument(
-        "--file",
-        help="path of the csv file",
+        "--file-heurist",
+        help="path of the csv heurist file",
         required=True,
         type=Path,
     )
@@ -176,7 +176,7 @@ def main():
 
     args = vars(parser.parse_args())
 
-    f = ReferenceTexts(args["file"], args["liturgical_function"])
+    f = ReferenceTexts(args["file_heurist"], args["liturgical_function"])
     f.get_statistics()
 
     if args["text_path"] and args["liturgical_function"] != []:

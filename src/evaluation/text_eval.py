@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import argparse
+import csv
 import os
 import warnings
 from pathlib import Path
@@ -29,7 +30,8 @@ def count_the_match(pred_file, true_file):
     print(list_columns)
 
 
-def evaluation(pred_file, true_file, metadata, output_path):
+# matcher avec metadata volume pour avoir le nom des volume
+def evaluation(pred_file, true_file, metadata_heurist, output_path, metadata_volume):
     """Evaluate the precision and the recall between the prediction and the true file"""
     # read csv and order the row
     df_pred = pd.read_csv(pred_file, index_col=0)
@@ -50,8 +52,8 @@ def evaluation(pred_file, true_file, metadata, output_path):
     new_df_pred = df_pred[list_columns]
 
     # new column name
-    meta = pd.read_csv(metadata)
-    list_col = meta["ID Annotation"].to_numpy()
+    meta_h = pd.read_csv(metadata_heurist)
+    list_col = meta_h["ID Annotation"].to_numpy()
     new_name = []
     for name in list_col:
         new_name.append(" ".join(name.split()[-6:]))
@@ -65,9 +67,16 @@ def evaluation(pred_file, true_file, metadata, output_path):
     new_df_true = new_df_true.set_axis(list_new_col, axis="columns")
     new_df_pred = new_df_pred.set_axis(list_new_col, axis="columns")
 
+    # volume name
+    with open(metadata_volume, newline="") as meta_file:
+        meta_v = list(csv.reader(meta_file, delimiter=","))
+
     # apply classification report
     for index, row in new_df_true.iterrows():
-        print(f"For volume_id {index}")
+        for row_v in meta_v:
+            if row_v[0] == index:
+                name_volume = row_v[1]
+        print(f"For volume_id {index} and volume name: {name_volume}")
         print(classification_report(row, new_df_pred.loc[index]))
 
     print("The classification report upon the whole dataframe")
@@ -100,10 +109,16 @@ def main():
         help="Path of the csv with true value",
     )
     parser.add_argument(
-        "--metadata",
+        "--metadata-heurist",
         type=Path,
         required=True,
         help="Path of the metadata file",
+    )
+    parser.add_argument(
+        "--metadata-volume",
+        type=Path,
+        required=True,
+        help="Path of the metadata of the volume",
     )
     parser.add_argument(
         "--output-path",
@@ -116,7 +131,11 @@ def main():
 
     # evaluate the matcher
     evaluation(
-        args["pred_file"], args["true_file"], args["metadata"], args["output_path"]
+        args["pred_file"],
+        args["true_file"],
+        args["metadata_heurist"],
+        args["output_path"],
+        args["metadata_volume"],
     )
 
     # Count the match between the column of the dataframe
