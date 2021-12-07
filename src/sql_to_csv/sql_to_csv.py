@@ -116,6 +116,7 @@ class SqlToCsv:
         self.cursor.execute(
             f"select class_name from classification where element_id = '{book_id}'"
         )
+        logging.info(book_id)
         return self.cursor.fetchall()[0][0]
 
     def save_book_as_csv(self, book_id):
@@ -139,6 +140,123 @@ class SqlToCsv:
                     trans = self.get_transcription_double_page(page_id)
                     writer.writerow([page_id, trans])
 
+    def save_book_as_txt(self, book_id):
+        """Save a book in a txt file"""
+        with open(os.path.join(self.output_path, f"{book_id}.txt"), "w") as file:
+            self.list_page_id = self.get_list_page(book_id)
+            type_page = self.check_type_page_from_book_id(book_id)
+            if type_page == "simple_page":
+                for page_id in self.list_page_id:
+                    trans = self.get_transcription_from_pageid_with_paragraph(
+                        page_id[0]
+                    )
+                    file.write(trans)
+            elif type_page == "double_page":
+                for page_id in self.list_page_id:
+                    trans = self.get_transcription_double_page(page_id[0])
+                    file.write(trans)
+                # logging.info(str(type_page))
+
+    def save_book_iob(self, book_id):
+        logging.info(f"Treating book id: {book_id}")
+        # Get pages
+        self.cursor.execute(
+            f"select element.id from element inner join element_path on element.id=element_path.child_id where element_path.parent_id='{book_id}' order by element_path.ordering and element.type = 'page'"
+        )
+        df_list_page = pd.DataFrame(self.cursor.fetchall(), columns=["id"])
+        h_tag = "none"
+        df_volume_ann = pd.DataFrame(columns=["id", "polygon", "function"])
+        for index, row in df_list_page.iterrows():
+
+            # Find text page
+            self.cursor.execute(
+                f"select id, polygon from element where id in (select child_id from element_path where parent_id='{row[0]}') and type='text_line'"
+            )
+            df_text = pd.DataFrame(self.cursor.fetchall(), columns=["id", "polygon"])
+            # Turn polygon into shape
+            df_text["polygon"] = df_text.polygon.apply(
+                lambda x: Polygon(ast.literal_eval(str(x)))
+            )
+            # Add empty column of text function
+            df_text["function"] = ""
+
+            # Find text segment
+            self.cursor.execute(
+                f"select name, polygon from element where id in (select child_id from element_path where parent_id = '{row[0]}') and type='text_segment'"
+            )
+            df_segment = pd.DataFrame(
+                self.cursor.fetchall(), columns=["name", "polygon"]
+            )
+
+            # If text segment found search to which line it belongs
+            if len(df_segment.index) != 0:
+                # Turn polygon into shape
+                df_segment["polygon"] = df_segment.polygon.apply(
+                    lambda x: Polygon(ast.literal_eval(str(x)))
+                )
+
+                # Check which segment belong to which line
+                for index_segment, row_segment in df_segment.iterrows():
+                    for index_text, row_text in df_text.iterrows():
+                        # Search if the segment belongs to the line
+                        if row_text["polygon"].intersects(row_segment["polygon"]):
+                            h_tag = row_segment["name"].split()[-1]
+                            row_text["function"] = h_tag
+                        else:
+                            row_text["function"] = h_tag
+            else:
+                df_text["function"] = h_tag
+            df_volume_ann = df_volume_ann.append(df_text)
+
+        # Add a column for the text
+        df_volume_ann["text"] = ""
+
+        # Get transcription
+        for index, row in df_volume_ann.iterrows():
+            self.cursor.execute(
+                f"""select text from transcription where element_id = '{row["id"]}';"""
+            )
+            text = self.cursor.fetchall()
+            if text:
+                row["text"] = text[0][0]
+
+        # Table of bio information
+        data_bio = []
+        function = ""
+        for index, row in df_volume_ann.iterrows():
+            if row["text"]:
+                for word in row["text"].split():
+                    if row["function"] == "none":
+                        bio_tag = f'O-{row["function"]}'
+                    elif row["function"] == function and function != "none":
+                        bio_tag = f'I-{row["function"]}'
+                    elif row["function"] != function:
+                        bio_tag = f'B-{row["function"]}'
+                    data_bio.append([word, bio_tag])
+                    function = row["function"]
+
+        # Write bio file
+        with open(os.path.join(self.output_path, f"{book_id}.bio"), "a") as file:
+            for row in data_bio:
+                file.write(f'{" ".join(row)}\n')
+
+    def save_fully_annotated_books(self):
+        list_book = [
+            "d1dd24a0-ca6a-4513-b86d-1d9547717c21",
+            "beb498f0-3ae1-44f6-837d-94ec92eb0953",
+            "23071571-8dd6-4d88-8c42-82a03fe5b4d5",
+            "a1353358-dcb4-4968-977f-6cda8e65a3a4",
+            "2cf86092-20b7-4455-b90e-6deb9c8ce777",
+            "5c1d9d2b-7623-4168-8853-f4858d4ba39d",
+            "eecf5f36-b31b-4f90-b9ac-d2f263acc9ea",
+            "29f43007-92c8-4927-b048-fa75899b31e7",
+            "68d4ffae-a5e5-4069-a751-48b543d72c37",
+            "a8a73f3a-beae-4c5e-be09-7d038649e8b1",
+        ]
+        for i in tqdm(list_book):
+            self.save_book_iob(i)
+        logging.info("txt")
+
     def save_all_books(self):
         """Save all the book (page id and transcription) in their respective csv named 'id_book'.csv"""
         self.list_book_id = self.get_list_book()
@@ -160,23 +278,6 @@ class SqlToCsv:
         self.list_book_id = self.get_list_book()
         for book_id in tqdm(self.list_book_id):
             self.save_book_as_txt(book_id[0])
-
-    def save_book_as_txt(self, book_id):
-        """Save a book in a txt file"""
-        with open(os.path.join(self.output_path, f"{book_id}.txt"), "w") as file:
-            self.list_page_id = self.get_list_page(book_id)
-            type_page = self.check_type_page_from_book_id(book_id)
-            if type_page == "simple_page":
-                for page_id in self.list_page_id:
-                    trans = self.get_transcription_from_pageid_with_paragraph(
-                        page_id[0]
-                    )
-                    file.write(trans)
-            elif type_page == "double_page":
-                for page_id in self.list_page_id:
-                    trans = self.get_transcription_double_page(page_id[0])
-                    file.write(trans)
-                # logging.info(str(type_page))
 
     def get_all_text_segment_psalm(self, liturgical_function):
         """
@@ -244,6 +345,12 @@ def main():
         type=Path,
     )
     parser.add_argument(
+        "--fully-annotated",
+        help="Extraction of only annotated volume",
+        required=False,
+        action="store_true",
+    )
+    parser.add_argument(
         "--savefile-path",
         help="path where the files will be created",
         required=True,
@@ -276,17 +383,28 @@ def main():
     args = vars(parser.parse_args())
 
     with SqlToCsv(args["file_sql"], args["savefile_path"]) as f:
-        # Save the book in csv format in the folder specified
-        if args["output_format"] == "csv":
-            f.save_all_books()
-        # Save the book in txt format in the folder specified
-        elif args["output_format"] == "txt":
-            f.save_all_book_as_txt()
+        # Get books fully annotated
+        if args["fully_annotated"]:
+            logging.info("FULLY ANNOTATED TRUE")
+            f.save_fully_annotated_books()
+
+        # Get all the books
+        else:
+            # Save all the book in csv format in the folder specified
+            if args["output_format"] == "csv":
+                f.save_all_books()
+            # Save all the book in txt format in the folder specified
+            elif args["output_format"] == "txt":
+                f.save_all_book_as_txt()
         # Save the csv of correspondence between volumes and the text specified
         if args["text_segment"] == "y":
             f.get_all_text_segment_psalm(args["liturgical_function"])
         if args["gen_meta_vol"] == "y":
             f.get_meta_vol()
+        # if args["fully_annotated"]:
+        #    logging.info('FULLY ANNOTATED TRUE')
+        # else:
+        #    logging.info('FULLY ANNOTATED FALSE')
 
 
 if __name__ == "__main__":
