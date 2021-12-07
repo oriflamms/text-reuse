@@ -8,6 +8,7 @@ import logging
 import os.path
 from pathlib import Path, PurePosixPath
 
+import pandas as pd
 from text_matcher.matcher import Matcher, Text
 from text_matcher.text_matcher import getFiles
 
@@ -77,6 +78,7 @@ def getting_info(text1, text2, threshold, cutoff, ngrams, stops, normalize):
     return list_object
 
 
+
 def interface(txt1, txt2, metadata_path, html_path, normalize):
     # Prepare the list of match
     match = getting_info(txt1, txt2, 3, 5, 3, False, normalize)
@@ -130,6 +132,9 @@ def interface(txt1, txt2, metadata_path, html_path, normalize):
             + text_volume[i[1][0][0] :]
         )
 
+        # Adding it in the evaluation dataframe
+        df.loc[volume_id, psalm_name] = 1
+
     # Open and write in the html
     with open(html_path, "w") as html_file:
         html_file.write(
@@ -144,14 +149,48 @@ def interface(txt1, txt2, metadata_path, html_path, normalize):
         html_file.write("</body></html>")
 
 
-def create_html(volume_folder, reference_folder, metadata, save_path):
+# A supprimé plus tard
+def create_df(metadata, volume_folder, save_path):
     texts = getFiles(volume_folder)
+    index = []
+    for filename in texts:
+        index.append(os.path.basename(filename).replace(".txt", ""))
+
+    df = pd.read_csv(metadata)
+    columns = df["ID Annotation"].to_numpy()
+
+    df = pd.DataFrame(0, columns=columns, index=index)
+    # logging.info(df)
+
+    # CSV de test vouer à disparaitre
+    df.to_csv(os.path.join(save_path, "pouet.csv"), index=True)
+    return df
+
+
+def create_html(volume_folder, reference_folder, metadata, save_path):
+    # Get the path of the text in the folder
+    texts = getFiles(volume_folder)
+
+    # Creation of the column for the evaluation df
+    df = pd.read_csv(metadata)
+    columns = df["ID Annotation"].to_numpy()
+    logging.info(columns)
+
+    # Creation if the index for the evaluation df
+    index = []
+    for filename in texts:
+        index.append(os.path.basename(filename).replace(".txt", ""))
+
+    # Creation of the df
+    df = pd.DataFrame(0, columns=columns, index=index)
 
     for filename in texts:
         volume_id = os.path.basename(filename)
         volume_html = volume_id.replace(".txt", ".html")
         volume_path = os.path.join(save_path, volume_html)
-        interface(str(filename), str(reference_folder), metadata, volume_path)
+        interface(str(filename), str(reference_folder), metadata, volume_path, df)
+
+    df.to_csv(os.path.join(save_path, "evaluation_df.csv"), index=True)
 
 
 def main():
