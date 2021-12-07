@@ -15,7 +15,6 @@ from text_matcher.text_matcher import getFiles
 ARKINDEX_VOLUME_URL = "https://arkindex.teklia.com/element/"
 HEURIST_TEXT_URL = "https://heurist.huma-num.fr/heurist/hclient/framecontent/recordEdit.php?db=stutzmann_horae&recID="
 
-
 def normalize_txt(txt):
     txt = txt.replace("\xa0", " ")
     txt = txt.replace("j", "i")
@@ -199,7 +198,7 @@ def create_html(volume_folder, reference_folder, metadata, save_path, normalize)
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Take a text and a repertory of text and find correspondence",
+        description="Take a text and a repertory of text and find correspondence + generate evaluation.csv + generate bio file for each volume",
     )
     parser.add_argument(
         "--input-volumes",
@@ -241,7 +240,7 @@ def main():
         create_html(
             PurePosixPath(args["input_volumes"]).as_posix(),
             PurePosixPath(args["input_references"]),
-            str(args["metadata"]),
+            str(args["metadata_heurist"]),
             PurePosixPath(args["output_html"]),
             True,
         )
@@ -250,7 +249,7 @@ def main():
         create_html(
             PurePosixPath(args["input_volumes"]).as_posix(),
             PurePosixPath(args["input_references"]),
-            str(args["metadata"]),
+            str(args["metadata_heurist"]),
             PurePosixPath(args["output_html"]),
             False,
         )
