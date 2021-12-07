@@ -61,10 +61,9 @@ class ReferenceTexts:
 
         # remove html tags and lower case
         self.df_text["clean_text"] = self.df_text["Text"].apply(clean_text)
-        print(self.df_text["ID Arkindex"])
 
     def write_in_txt(self, output_path):
-        """Write in txt file the clean text for each psalm's text in a folder"""
+        """Write in txt file the clean text for each psalm's text in a htmls"""
         for index, row in self.df_text.iterrows():
             with open(
                 os.path.join(output_path, f'{row["ID Arkindex"]}.txt'),
@@ -74,9 +73,11 @@ class ReferenceTexts:
                 f.write(row["clean_text"])
 
     def write_metadata(self, metadata_path):
-        self.df[["ID Arkindex", "ID Annotation", "Work H-ID"]].to_csv(
-            os.path.join(metadata_path, "metadata.csv"), index=False
+        df_meta = self.df[self.df["Liturgical function"] == self.liturgical_function]
+        df_meta[["ID Arkindex", "ID Annotation", "Work H-ID"]].to_csv(
+            os.path.join(metadata_path, "metadata_heurist.csv"), index=False
         )
+        # print(df_meta[["ID Arkindex", "ID Annotation", "Work H-ID"]].size)
 
     def get_statistics(self):
         """Return the stats and create files on frequencies"""
@@ -148,8 +149,8 @@ def main():
         description="Parse a heurist export and make stats",
     )
     parser.add_argument(
-        "--file",
-        help="path of the csv file",
+        "--file-heurist",
+        help="path of the csv heurist file",
         required=True,
         type=Path,
     )
@@ -175,13 +176,13 @@ def main():
 
     args = vars(parser.parse_args())
 
-    f = ReferenceTexts(args["file"], args["liturgical_function"])
+    f = ReferenceTexts(args["file_heurist"], args["liturgical_function"])
     f.get_statistics()
 
     if args["text_path"] and args["liturgical_function"] != []:
         f.write_in_txt(args["text_path"])
 
-    if args["metadata_path"]:
+    if args["metadata_path"] and args["liturgical_function"]:
         f.write_metadata(args["metadata_path"])
 
 

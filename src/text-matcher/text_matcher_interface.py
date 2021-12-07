@@ -8,6 +8,7 @@ import logging
 import os.path
 from pathlib import Path, PurePosixPath
 
+import pandas as pd
 from text_matcher.matcher import Matcher, Text
 from text_matcher.text_matcher import getFiles
 
@@ -18,8 +19,16 @@ HEURIST_TEXT_URL = "https://heurist.huma-num.fr/heurist/hclient/framecontent/rec
 def normalize_txt(txt):
     txt = txt.replace("\xa0", " ")
     txt = txt.replace("j", "i")
+    txt = txt.replace("J", "I")
     txt = "".join(txt)
-    txt = txt.replace("u", "v")
+    txt = txt.replace("v", "u")
+    txt = txt.replace("V", "U")
+    txt = txt.replace("ë", "e")
+    txt = txt.replace("Ë", "E")
+    txt = txt.replace("æ", "e")
+    txt = txt.replace("Æ", "E")
+    txt = txt.replace("œ", "e")
+    txt = txt.replace("Œ", "E")
     logging.info("normalization done")
     return txt
 
@@ -42,7 +51,7 @@ def getting_info(text1, text2, threshold, cutoff, ngrams, stops, normalize):
     for index, pair in enumerate(pairs):
         filenameA, filenameB = pair[0], pair[1]
 
-        # Put this in a dictionary so we don't have to process a file twice.
+        # Put this in a dictionary, so we don't have to process a file twice.
         for filename in [filenameA, filenameB]:
             if filename not in prevTextObjs:
                 if normalize:
@@ -77,7 +86,7 @@ def getting_info(text1, text2, threshold, cutoff, ngrams, stops, normalize):
     return list_object
 
 
-def interface(txt1, txt2, metadata_path, html_path, normalize):
+def interface(txt1, txt2, metadata_path, html_path, df, normalize):
     # Prepare the list of match
     match = getting_info(txt1, txt2, 3, 5, 3, False, normalize)
     # Ordering the list of match by order of apparition in the text
@@ -85,7 +94,8 @@ def interface(txt1, txt2, metadata_path, html_path, normalize):
 
     # Read the text of the volume
     with open(txt1, "r") as text_of_interest_file:
-        text_volume = text_of_interest_file.read()
+
+        text_volume = normalize_txt(text_of_interest_file.read())
         if normalize:
             text_volume = normalize_txt(text_volume)
 
@@ -107,12 +117,13 @@ def interface(txt1, txt2, metadata_path, html_path, normalize):
             if normalize:
                 psalm_text = normalize_txt(psalm_text)
 
-        # Fetch psalm id from input folder to create heurist link
+        # Fetch psalm id from input htmls to create heurist link
         psalm_id = os.path.basename(i[0])
         psalm_id = psalm_id.replace(".txt", "")
 
         for row in data:
             if row[0] == psalm_id:
+                # id_arkindex = row[0]
                 psalm_name = row[1]
                 work_id = row[2]
 
@@ -130,6 +141,9 @@ def interface(txt1, txt2, metadata_path, html_path, normalize):
             + text_volume[i[1][0][0] :]
         )
 
+        # Adding it in the evaluation dataframe
+        df.loc[volume_id, psalm_name] = 1
+
     # Open and write in the html
     with open(html_path, "w") as html_file:
         html_file.write(
@@ -144,34 +158,62 @@ def interface(txt1, txt2, metadata_path, html_path, normalize):
         html_file.write("</body></html>")
 
 
-def create_html(volume_folder, reference_folder, metadata, save_path):
+def create_html(volume_folder, reference_folder, metadata, save_path, normalize):
+    # Get the path of the text in the htmls
     texts = getFiles(volume_folder)
 
+    # Creation of the column for the evaluation df
+    df = pd.read_csv(metadata)
+    # columns = df["ID Arkindex"].to_numpy()
+    columns = df["ID Annotation"].to_numpy()
+    logging.info(columns)
+
+    # Creation if the index for the evaluation df
+    index = []
+    for filename in texts:
+        index.append(os.path.basename(filename).replace(".txt", ""))
+
+    # Creation of the df
+    df = pd.DataFrame(0, columns=columns, index=index)
+
+    # Go through the volumes and apply text-matcher to them while creating html
     for filename in texts:
         volume_id = os.path.basename(filename)
         volume_html = volume_id.replace(".txt", ".html")
         volume_path = os.path.join(save_path, volume_html)
-        interface(str(filename), str(reference_folder), metadata, volume_path)
+        interface(
+            str(filename), str(reference_folder), metadata, volume_path, df, normalize
+        )
+
+    # Give proper name with h_tag to the column of the df
+    new_column = []
+    for i in df.columns:
+        new_column.append(str(i).split()[-1])
+
+    df = df.set_axis(new_column, axis="columns")
+
+    # Export the dataframe with a csv format
+    df.to_csv(os.path.join(save_path, "evaluation_df.csv"), index=True)
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Take a text and a repertory of text and find correspondence",
+        description="Take a text and a repertory of text and find correspondence + generate evaluation.csv + generate bio file for each volume",
     )
     parser.add_argument(
-        "--input-txt",
+        "--input-volumes",
         required=True,
         type=Path,
         help="Path of the text of interest",
     )
     parser.add_argument(
-        "--input-folder",
+        "--input-references",
         required=True,
         type=Path,
         help="Path of the folder of the text of reference",
     )
     parser.add_argument(
-        "--metadata",
+        "--metadata-heurist",
         help="File with the metadata to indicate the name of the recognised text",
         required=True,
         type=Path,
@@ -181,7 +223,7 @@ def main():
         "--output-html",
         required=True,
         type=Path,
-        help="Path where the html will be located, please be sure to put the css in the same folder",
+        help="Path where the html will be located, please be sure to put the css in the same htmls",
     )
     parser.add_argument(
         "--normalize",
@@ -193,36 +235,22 @@ def main():
 
     args = vars(parser.parse_args())
 
-    """
-    interface(
-        args["input_txt"],
-        PurePosixPath(args["input_folder"]).as_posix(),
-        args["metadata"],
-        args["output_html"],
-    )"""
-    create_html(
-        PurePosixPath(args["input_txt"]).as_posix(),
-        PurePosixPath(args["input_folder"]),
-        str(args["metadata"]),
-        PurePosixPath(args["output_html"]),
-    )
-
     # Normalize the text before application of the interface
-    if args["normalize"].lower():
-        interface(
-            args["input_txt"],
-            PurePosixPath(args["input_folder"]).as_posix(),
-            args["metadata"],
-            args["output_html"],
+    if args["normalize"]:
+        create_html(
+            PurePosixPath(args["input_volumes"]).as_posix(),
+            PurePosixPath(args["input_references"]),
+            str(args["metadata_heurist"]),
+            PurePosixPath(args["output_html"]),
             True,
         )
         logging.info("normalization done")
     else:
-        interface(
-            args["input_txt"],
-            PurePosixPath(args["input_folder"]).as_posix(),
-            args["metadata"],
-            args["output_html"],
+        create_html(
+            PurePosixPath(args["input_volumes"]).as_posix(),
+            PurePosixPath(args["input_references"]),
+            str(args["metadata_heurist"]),
+            PurePosixPath(args["output_html"]),
             False,
         )
 
