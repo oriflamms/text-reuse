@@ -86,7 +86,7 @@ def getting_info(text1, text2, threshold, cutoff, ngrams, stops, normalize):
     return list_object
 
 
-def interface(txt1, txt2, metadata_path, html_path, df, normalize):
+def interface(txt1, txt2, metadata_path, html_path, df, normalize, save_path):
     # Prepare the list of match
     match = getting_info(txt1, txt2, 3, 5, 3, False, normalize)
     # Ordering the list of match by order of apparition in the text
@@ -109,6 +109,9 @@ def interface(txt1, txt2, metadata_path, html_path, df, normalize):
 
     # Creation of the link for the html
     volume_url = os.path.join(ARKINDEX_VOLUME_URL, volume_id)
+
+    # Copy text for bio eval
+    bio_text = text_volume
 
     # Injecting the text of the volume with html marker
     for i in reversed(match):
@@ -140,6 +143,35 @@ def interface(txt1, txt2, metadata_path, html_path, df, normalize):
             + f'<a href="{heurist_link}"><mark>'
             + text_volume[i[1][0][0] :]
         )
+
+        # Adding marks to the bio eval text
+        bio_text = bio_text[: i[1][0][1]] + "!" + bio_text[i[1][0][1] :]
+        bio_text = (
+            bio_text[: i[1][0][0]]
+            + f"/{psalm_name.split()[-1]}-"
+            + bio_text[i[1][0][0] :]
+        )
+
+        # Create list with the proper tag
+        list_bio = []
+        function = "O"
+        for word in bio_text.split():
+            if word.split()[0][-1] == "!":
+                function = "O"
+                list_bio.append([word.split()[0][:-2], function])
+            elif function.split()[0][0] == "B":
+                function = f"I{function.split()[0][1:]}"
+                list_bio.append([word, function])
+            elif word.split()[0][0] == "/":
+                function = f'B-{word.split("-")[0][1:]}'
+                list_bio.append([word.split("-")[1], function])
+            else:
+                list_bio.append([word, function])
+
+        # Write bio file
+        with open(os.path.join(save_path, f"{volume_id}.bio"), "a") as file:
+            for row in list_bio:
+                file.write(f'{" ".join(row)}\n')
 
         # Adding it in the evaluation dataframe
         df.loc[volume_id, psalm_name] = 1
@@ -182,7 +214,13 @@ def create_html(volume_folder, reference_folder, metadata, save_path, normalize)
         volume_html = volume_id.replace(".txt", ".html")
         volume_path = os.path.join(save_path, volume_html)
         interface(
-            str(filename), str(reference_folder), metadata, volume_path, df, normalize
+            str(filename),
+            str(reference_folder),
+            metadata,
+            volume_path,
+            df,
+            normalize,
+            save_path,
         )
 
     # Give proper name with h_tag to the column of the df
@@ -218,7 +256,6 @@ def main():
         required=True,
         type=Path,
     )
-    parser.add_argument("--output-html", required=True, type=Path)
     parser.add_argument(
         "--output-html",
         required=True,
