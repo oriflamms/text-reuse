@@ -227,7 +227,7 @@ class SqlToCsv:
             if row["text"]:
                 for word in row["text"].split():
                     if row["function"] == "none":
-                        bio_tag = f'O-{row["function"]}'
+                        bio_tag = "O"
                     elif row["function"] == function and function != "none":
                         bio_tag = f'I-{row["function"]}'
                     elif row["function"] != function:
@@ -401,10 +401,6 @@ def main():
             f.get_all_text_segment_psalm(args["liturgical_function"])
         if args["gen_meta_vol"] == "y":
             f.get_meta_vol()
-        # if args["fully_annotated"]:
-        #    logging.info('FULLY ANNOTATED TRUE')
-        # else:
-        #    logging.info('FULLY ANNOTATED FALSE')
 
 
 if __name__ == "__main__":
