@@ -157,7 +157,7 @@ class SqlToCsv:
                     file.write(trans)
                 # logging.info(str(type_page))
 
-    def save_book_iob(self, book_id):
+    def save_book_iob(self, book_id, lit_function):
         logging.info(f"Treating book id: {book_id}")
         # Get pages
         self.cursor.execute(
@@ -220,6 +220,24 @@ class SqlToCsv:
             if text:
                 row["text"] = text[0][0]
 
+        # Review if there is a liturgical function
+        if lit_function:
+            logging.info(lit_function)
+            self.cursor.execute(
+                f"select name from element where id in (select child_id from element_path where parent_id in (select child_id from element_path where parent_id = '{book_id}')) and type = 'text_segment' and name like '%{lit_function}%'"
+            )
+            df_function = pd.DataFrame(data=self.cursor.fetchall(), columns=["name"])
+            df_function["h_tag"] = ""
+            for index, row in df_function.iterrows():
+                row["h_tag"] = row["name"].split()[-1]
+            np_h_tag = df_function["h_tag"].to_numpy()
+
+            for index, row in df_volume_ann.iterrows():
+                if row["function"] in np_h_tag:
+                    row["function"] = "none"
+        else:
+            logging.info("No lit function")
+
         # Table of bio information
         data_bio = []
         function = ""
@@ -240,7 +258,16 @@ class SqlToCsv:
             for row in data_bio:
                 file.write(f'{" ".join(row)}\n')
 
-    def save_fully_annotated_books(self):
+    def get_complete_single(self, book_id):
+        """The complete base does not indicate for every volume if they are in simple or double page therefore the
+        classical code does not work"""
+        with open(os.path.join(self.output_path, f"{book_id}.txt"), "w") as file:
+            self.list_page_id = self.get_list_page(book_id)
+            for page_id in self.list_page_id:
+                trans = self.get_transcription_from_pageid_with_paragraph(page_id[0])
+                file.write(trans)
+
+    def save_fully_annotated_books(self, lit_function):
         list_book = [
             "d1dd24a0-ca6a-4513-b86d-1d9547717c21",
             "beb498f0-3ae1-44f6-837d-94ec92eb0953",
@@ -254,7 +281,8 @@ class SqlToCsv:
             "a8a73f3a-beae-4c5e-be09-7d038649e8b1",
         ]
         for i in tqdm(list_book):
-            self.save_book_iob(i)
+            self.save_book_iob(i, lit_function)
+            self.get_complete_single(i)
         logging.info("txt")
 
     def save_all_books(self):
@@ -386,7 +414,7 @@ def main():
         # Get books fully annotated
         if args["fully_annotated"]:
             logging.info("FULLY ANNOTATED TRUE")
-            f.save_fully_annotated_books()
+            f.save_fully_annotated_books(args["liturgical_function"])
 
         # Get all the books
         else:
