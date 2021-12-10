@@ -168,13 +168,13 @@ def interface(txt1, txt2, metadata_path, html_path, df, normalize, save_path):
             else:
                 list_bio.append([word, function])
 
-        # Write bio file
-        with open(os.path.join(save_path, f"{volume_id}.bio"), "a") as file:
-            for row in list_bio:
-                file.write(f'{" ".join(row)}\n')
-
         # Adding it in the evaluation dataframe
         df.loc[volume_id, psalm_name] = 1
+
+    # Write bio file
+    with open(os.path.join(save_path, f"{volume_id}.bio"), "a") as file:
+        for row in list_bio:
+            file.write(f'{" ".join(row)}\n')
 
     # Open and write in the html
     with open(html_path, "w") as html_file:

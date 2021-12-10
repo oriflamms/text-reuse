@@ -170,13 +170,14 @@ class SqlToCsv:
 
             # Find text page
             self.cursor.execute(
-                f"select id, polygon from element where id in (select child_id from element_path where parent_id='{row[0]}') and type='text_line'"
+                f"select id, polygon from element where id in (select child_id from element_path where parent_id='{row[0]}') and type='text_line' "
             )
             df_text = pd.DataFrame(self.cursor.fetchall(), columns=["id", "polygon"])
             # Turn polygon into shape
             df_text["polygon"] = df_text.polygon.apply(
                 lambda x: Polygon(ast.literal_eval(str(x)))
             )
+
             # Add empty column of text function
             df_text["function"] = ""
 
@@ -206,7 +207,14 @@ class SqlToCsv:
                             row_text["function"] = h_tag
             else:
                 df_text["function"] = h_tag
-            df_volume_ann = df_volume_ann.append(df_text)
+
+            # Order polygon
+            df_order = df_text.copy()
+            df_order["y_axis"] = df_order.polygon.apply(lambda a: a.centroid.y)
+            df_order = df_order.sort_values(by=["y_axis"])
+            columns = ["id", "polygon", "function"]
+
+            df_volume_ann = df_volume_ann.append(df_order[columns])
 
         # Add a column for the text
         df_volume_ann["text"] = ""
@@ -258,14 +266,24 @@ class SqlToCsv:
             for row in data_bio:
                 file.write(f'{" ".join(row)}\n')
 
+        with open(os.path.join(self.output_path, f"{book_id}.txt"), "a") as file:
+            for row in data_bio:
+                file.write(f"{row[0]} ")
+
     def get_complete_single(self, book_id):
         """The complete base does not indicate for every volume if they are in simple or double page therefore the
         classical code does not work"""
+        test = []
+        count = 0
         with open(os.path.join(self.output_path, f"{book_id}.txt"), "w") as file:
             self.list_page_id = self.get_list_page(book_id)
             for page_id in self.list_page_id:
                 trans = self.get_transcription_from_pageid_with_paragraph(page_id[0])
                 file.write(trans)
+                count += len(trans.split())
+                test.append(trans)
+            print(count)
+            # logging.info(test)
 
     def save_fully_annotated_books(self, lit_function):
         list_book = [
@@ -282,7 +300,7 @@ class SqlToCsv:
         ]
         for i in tqdm(list_book):
             self.save_book_iob(i, lit_function)
-            self.get_complete_single(i)
+            # self.get_complete_single(i)
         logging.info("txt")
 
     def save_all_books(self):
