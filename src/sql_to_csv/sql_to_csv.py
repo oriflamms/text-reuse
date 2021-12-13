@@ -111,6 +111,14 @@ class SqlToCsv:
             transcription = [phrase[0].replace("\n", " ") for phrase in transcription]
         return "".join(transcription)
 
+    def check_type_page_from_book_id_complete(self, book_id):
+        """Check the type of the page to apply the right get_transcription algorithm for the complete corpus"""
+        self.cursor.execute(
+            f"select value from metadata where name = 'Digitization Type' and element_id = '{book_id}'"
+        )
+        self.type_page = self.cursor.fetchall()[0][0]
+
+    # For 50_mss only
     def check_type_page_from_book_id(self, book_id):
         """Check the type of the page to apply the right get_transcription algorithm"""
         self.cursor.execute(
@@ -157,7 +165,27 @@ class SqlToCsv:
                     file.write(trans)
                 # logging.info(str(type_page))
 
-    def save_iod(self, book_id, lit_function):
+    def save_book_complete(self, book_id):
+        """Save book from complete corpus"""
+        with open(os.path.join(self.output_path, f"{book_id}.txt"), "w") as file:
+            self.list_page_id = self.get_list_page(book_id)
+            self.check_type_page_from_book_id_complete(book_id)
+            if self.type_page == "single page":
+                for page_id in self.list_page_id:
+                    trans = self.get_transcription_from_pageid_with_paragraph(
+                        page_id[0]
+                    )
+                    file.write(trans)
+            elif self.type_page == "double page":
+                # A changer quand la nouvelle extraction sera disponible
+                logging.info("tis but a false double paged book")
+                for page_id in self.list_page_id:
+                    trans = self.get_transcription_from_pageid_with_paragraph(
+                        page_id[0]
+                    )
+                    file.write(trans)
+
+    def save_bio(self, book_id, lit_function):
         logging.info(book_id)
         # Get list page
         self.get_list_page(book_id)
@@ -274,7 +302,8 @@ class SqlToCsv:
                         bio_tag = f'I-{row["function"]}'
                     elif row["function"] != function:
                         bio_tag = f'B-{row["function"]}'
-                    bio_data.append([word, bio_tag, row["page"]])
+                    # bio_data.append([word, bio_tag, row["page"]])
+                    bio_data.append([word, bio_tag])
                     function = row["function"]
 
         # Write bio file
@@ -285,134 +314,6 @@ class SqlToCsv:
         with open(os.path.join(self.output_path, f"{book_id}.txt"), "a") as file:
             for row in bio_data:
                 file.write(f"{row[0]} ")
-
-    def save_book_iob(self, book_id, lit_function):
-        logging.info(f"Treating book id: {book_id}")
-        # Get pages
-        self.cursor.execute(
-            f"select element.id from element inner join element_path on element.id=element_path.child_id where element_path.parent_id='{book_id}' order by element_path.ordering and element.type = 'page'"
-        )
-        df_list_page = pd.DataFrame(self.cursor.fetchall(), columns=["id"])
-        h_tag = "none"
-        df_volume_ann = pd.DataFrame(columns=["id", "polygon", "function"])
-        for index, row in df_list_page.iterrows():
-
-            # Find text page
-            self.cursor.execute(
-                f"select id, polygon from element where id in (select child_id from element_path where parent_id='{row[0]}') and type='text_line' "
-            )
-            df_text = pd.DataFrame(self.cursor.fetchall(), columns=["id", "polygon"])
-            # Turn polygon into shape
-            df_text["polygon"] = df_text.polygon.apply(
-                lambda x: Polygon(ast.literal_eval(str(x)))
-            )
-
-            # Add empty column of text function
-            df_text["function"] = ""
-
-            # Find text segment
-            self.cursor.execute(
-                f"select name, polygon from element where id in (select child_id from element_path where parent_id = '{row[0]}') and type='text_segment'"
-            )
-            df_segment = pd.DataFrame(
-                self.cursor.fetchall(), columns=["name", "polygon"]
-            )
-
-            # If text segment found search to which line it belongs
-            if len(df_segment.index) != 0:
-                # Turn polygon into shape
-                df_segment["polygon"] = df_segment.polygon.apply(
-                    lambda x: Polygon(ast.literal_eval(str(x)))
-                )
-
-                # Check which segment belong to which line
-                for index_segment, row_segment in df_segment.iterrows():
-                    for index_text, row_text in df_text.iterrows():
-                        # Search if the segment belongs to the line
-                        if row_text["polygon"].intersects(row_segment["polygon"]):
-                            h_tag = row_segment["name"].split()[-1]
-                            row_text["function"] = h_tag
-                        else:
-                            row_text["function"] = h_tag
-            else:
-                df_text["function"] = h_tag
-
-            # Order polygon
-            df_order = df_text.copy()
-            df_order["y_axis"] = df_order.polygon.apply(lambda a: a.centroid.y)
-            df_order = df_order.sort_values(by=["y_axis"])
-            columns = ["id", "polygon", "function"]
-
-            df_volume_ann = df_volume_ann.append(df_order[columns])
-
-        # Add a column for the text
-        df_volume_ann["text"] = ""
-
-        # Get transcription
-        for index, row in df_volume_ann.iterrows():
-            self.cursor.execute(
-                f"""select text from transcription where element_id = '{row["id"]}';"""
-            )
-            text = self.cursor.fetchall()
-            if text:
-                row["text"] = text[0][0]
-
-        # Review if there is a liturgical function
-        if lit_function:
-            logging.info(lit_function)
-            self.cursor.execute(
-                f"select name from element where id in (select child_id from element_path where parent_id in (select child_id from element_path where parent_id = '{book_id}')) and type = 'text_segment' and name like '%{lit_function}%'"
-            )
-            df_function = pd.DataFrame(data=self.cursor.fetchall(), columns=["name"])
-            df_function["h_tag"] = ""
-            for index, row in df_function.iterrows():
-                row["h_tag"] = row["name"].split()[-1]
-            np_h_tag = df_function["h_tag"].to_numpy()
-
-            for index, row in df_volume_ann.iterrows():
-                if row["function"] in np_h_tag:
-                    row["function"] = "none"
-        else:
-            logging.info("No lit function")
-
-        # Table of bio information
-        data_bio = []
-        function = ""
-        for index, row in df_volume_ann.iterrows():
-            if row["text"]:
-                for word in row["text"].split():
-                    if row["function"] == "none":
-                        bio_tag = "O"
-                    elif row["function"] == function and function != "none":
-                        bio_tag = f'I-{row["function"]}'
-                    elif row["function"] != function:
-                        bio_tag = f'B-{row["function"]}'
-                    data_bio.append([word, bio_tag])
-                    function = row["function"]
-
-        # Write bio file
-        with open(os.path.join(self.output_path, f"{book_id}.bio"), "a") as file:
-            for row in data_bio:
-                file.write(f'{" ".join(row)}\n')
-
-        with open(os.path.join(self.output_path, f"{book_id}.txt"), "a") as file:
-            for row in data_bio:
-                file.write(f"{row[0]} ")
-
-    def get_complete_single(self, book_id):
-        """The complete base does not indicate for every volume if they are in simple or double page therefore the
-        classical code does not work"""
-        test = []
-        count = 0
-        with open(os.path.join(self.output_path, f"{book_id}.txt"), "w") as file:
-            self.list_page_id = self.get_list_page(book_id)
-            for page_id in self.list_page_id:
-                trans = self.get_transcription_from_pageid_with_paragraph(page_id[0])
-                file.write(trans)
-                count += len(trans.split())
-                test.append(trans)
-            print(count)
-            # logging.info(test)
 
     def save_fully_annotated_books(self, lit_function):
         list_book = [
@@ -427,10 +328,11 @@ class SqlToCsv:
             "68d4ffae-a5e5-4069-a751-48b543d72c37",
             "a8a73f3a-beae-4c5e-be09-7d038649e8b1",
         ]
-        for i in tqdm(list_book):
-            # self.save_book_iob(i, lit_function)
-            self.save_iod(i, lit_function)
-            # self.get_complete_single(i)
+        for book in tqdm(list_book):
+            # self.save_bio(book, lit_function)
+            self.save_book_complete(book)
+
+        self.get_text_segment_complete_fully(lit_function, list_book)
         logging.info("txt")
 
     def save_all_books(self):
@@ -454,6 +356,46 @@ class SqlToCsv:
         self.list_book_id = self.get_list_book()
         for book_id in tqdm(self.list_book_id):
             self.save_book_as_txt(book_id[0])
+
+    def get_text_segment_complete_fully(self, liturgical_function, corpus):
+        # Get the name of text segment with that are Psalm
+        self.cursor.execute(
+            "select name from element where id in (select child_id from element_path where parent_id in (select child_id from element_path where parent_id in ('d1dd24a0-ca6a-4513-b86d-1d9547717c21','beb498f0-3ae1-44f6-837d-94ec92eb0953','23071571-8dd6-4d88-8c42-82a03fe5b4d5','a1353358-dcb4-4968-977f-6cda8e65a3a4','2cf86092-20b7-4455-b90e-6deb9c8ce777','5c1d9d2b-7623-4168-8853-f4858d4ba39d','eecf5f36-b31b-4f90-b9ac-d2f263acc9ea','29f43007-92c8-4927-b048-fa75899b31e7','68d4ffae-a5e5-4069-a751-48b543d72c37','a8a73f3a-beae-4c5e-be09-7d038649e8b1'))) and type = 'text_segment' and name like '%Psalm%' group by name;"
+        )
+        columns = []
+        index = []
+
+        # create an array with the good name for index and column
+        for i in self.cursor.fetchall():
+            columns.append(i[0])
+        for i in corpus:
+            index.append(i)
+
+        # Creation of the dataframe filled with 0 and with the id of volume as row and the name of text segment as column
+        df = pd.DataFrame(0, columns=columns, index=index)
+
+        # Put a 1 in the dataframe if the volume contain the text segment
+        for index, row in df.iterrows():
+            # Find text segment for each volume
+            self.cursor.execute(
+                f"select name from element where id in (select child_id from element_path where parent_id in (select child_id from element_path where parent_id = '{index}')) and type = 'text_segment' and name like '%{liturgical_function}%';"
+            )
+            for i in self.cursor.fetchall():
+                if i[0] in df.columns:
+                    row[i[0]] = 1
+
+        new_column = []
+        for i in df.columns:
+            new_column.append(str(i).split()[-1])
+            # print(str(i).split()[-1])
+
+        df = df.set_axis(new_column, axis="columns")
+
+        # Extract the dataframe as a csv
+        df.to_csv(
+            os.path.join(self.output_path, "complete_text_segment.csv"),
+            index=True,
+        )
 
     def get_all_text_segment_psalm(self, liturgical_function):
         """
