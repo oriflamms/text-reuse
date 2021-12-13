@@ -157,6 +157,135 @@ class SqlToCsv:
                     file.write(trans)
                 # logging.info(str(type_page))
 
+    def save_iod(self, book_id, lit_function):
+        logging.info(book_id)
+        # Get list page
+        self.get_list_page(book_id)
+
+        # Initiate function
+        h_tag = "none"
+
+        # Initiate the volume dataframe
+        df_volume = pd.DataFrame(columns=["id", "function", "page"])
+
+        # Get the text in the pages
+        for row in self.list_page_id:
+            # Find text page
+            self.cursor.execute(
+                f"select id, polygon from element where id in (select child_id from element_path where parent_id='{row[0]}') and type='text_line'"
+            )
+            df_info_page = pd.DataFrame(
+                data=self.cursor.fetchall(), columns=["id", "polygon"]
+            )
+
+            # Turn the polygon into shapes
+            df_info_page["polygon"] = df_info_page.polygon.apply(
+                lambda x: Polygon(ast.literal_eval(str(x)))
+            )
+
+            # Order the text lines
+            df_info_page["y_axis"] = df_info_page.polygon.apply(lambda a: a.centroid.y)
+            df_info_page = df_info_page.sort_values(by=["y_axis"])
+
+            # Find text segment
+            self.cursor.execute(
+                f"select name, polygon from element where id in (select child_id from element_path where parent_id = '{row[0]}') and type='text_segment'"
+            )
+            df_info_segment = pd.DataFrame(
+                data=self.cursor.fetchall(), columns=["name", "polygon"]
+            )
+
+            # Add a function column
+            df_info_page["function"] = ""
+
+            # Match the text segment in the text
+            if df_info_segment["polygon"].any():
+                # Turn the polygon into shape
+                df_info_segment["polygon"] = df_info_segment.polygon.apply(
+                    lambda x: Polygon(ast.literal_eval(str(x)))
+                )
+
+                # Check which segment belong in which line
+                for segment_index, segment_row in df_info_segment.iterrows():
+                    for page_index, page_row in df_info_page.iterrows():
+                        # Search if the segment belongs to the line
+                        if page_row["polygon"].intersects(segment_row["polygon"]):
+                            h_tag = segment_row["name"].split()[-1]
+                            df_info_page.loc[page_index, "function"] = h_tag
+                        else:
+                            df_info_page.loc[page_index, "function"] = h_tag
+                            page_row["function"] = h_tag
+            else:
+                for page_index, page_row in df_info_page.iterrows():
+                    df_info_page.loc[page_index, "function"] = h_tag
+
+            # Add name of page
+            df_info_page["page"] = row[1]
+
+            # Append the data in the volume df
+            columns = ["id", "function", "page"]
+            df_volume = df_volume.append(df_info_page[columns])
+
+        # Add a column for the text
+        df_volume["text"] = ""
+
+        # Get transcription
+        for index, row in df_volume.iterrows():
+            self.cursor.execute(
+                f"""select text from transcription where element_id = '{row["id"]}';"""
+            )
+            text = self.cursor.fetchall()
+            if text:
+                row["text"] = text[0][0]
+
+        # Review if there is a liturgical function
+        if lit_function:
+            logging.info(lit_function)
+            # Get the name of the wanted text
+            self.cursor.execute(
+                f"select name from element where id in (select child_id from element_path where parent_id in (select child_id from element_path where parent_id = '{book_id}')) and type = 'text_segment' and name like '%{lit_function}%'"
+            )
+            df_function = pd.DataFrame(data=self.cursor.fetchall(), columns=["name"])
+
+            # Get the h_tag
+            df_function["h_tag"] = ""
+            for index, row in df_function.iterrows():
+                row["h_tag"] = row["name"].split()[-1]
+
+            # Get a list of the h_tag
+            np_h_tag = df_function["h_tag"].to_numpy()
+
+            # Suppress the function not wanted
+            for index, row in df_volume.iterrows():
+                if row["function"] not in np_h_tag:
+                    row["function"] = "none"
+        else:
+            logging.info("No lit function")
+
+        # Table of bio information
+        bio_data = []
+        function = ""
+        for index, row in df_volume.iterrows():
+            if row["text"]:
+                for word in row["text"].split():
+                    if row["function"] == "none":
+                        bio_tag = "O"
+                    elif row["function"] == function and function != "none":
+                        bio_tag = f'I-{row["function"]}'
+                    elif row["function"] != function:
+                        bio_tag = f'B-{row["function"]}'
+                    bio_data.append([word, bio_tag, row["page"]])
+                    function = row["function"]
+
+        # Write bio file
+
+        with open(os.path.join(self.output_path, f"{book_id}.bio"), "a") as file:
+            for row in bio_data:
+                file.write(f'{" ".join(str(word) for word in row)}\n')
+        with open(os.path.join(self.output_path, f"{book_id}.txt"), "a") as file:
+            for row in bio_data:
+                file.write(f"{row[0]} ")
+
     def save_book_iob(self, book_id, lit_function):
         logging.info(f"Treating book id: {book_id}")
         # Get pages
@@ -299,7 +428,8 @@ class SqlToCsv:
             "a8a73f3a-beae-4c5e-be09-7d038649e8b1",
         ]
         for i in tqdm(list_book):
-            self.save_book_iob(i, lit_function)
+            # self.save_book_iob(i, lit_function)
+            self.save_iod(i, lit_function)
             # self.get_complete_single(i)
         logging.info("txt")
 
