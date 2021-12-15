@@ -167,7 +167,7 @@ class SqlToCsv:
 
     def save_book_complete(self, book_id):
         """Save book from complete corpus"""
-        with open(os.path.join(self.output_path, f"{book_id}.txt"), "w") as file:
+        with open(os.path.join(self.output_path, f"para_{book_id}.txt"), "w") as file:
             self.list_page_id = self.get_list_page(book_id)
             self.check_type_page_from_book_id_complete(book_id)
             if self.type_page == "single page":
@@ -214,6 +214,7 @@ class SqlToCsv:
             # Order the text lines
             df_info_page["y_axis"] = df_info_page.polygon.apply(lambda a: a.centroid.y)
             df_info_page = df_info_page.sort_values(by=["y_axis"])
+            df_info_page = df_info_page.reset_index(drop=True)
 
             # Find text segment
             self.cursor.execute(
@@ -234,15 +235,22 @@ class SqlToCsv:
                 )
 
                 # Check which segment belong in which line
+                # df_info_page = df_info_page.sort_values(by=["y_axis"])
+
                 for segment_index, segment_row in df_info_segment.iterrows():
                     for page_index, page_row in df_info_page.iterrows():
                         # Search if the segment belongs to the line
+
                         if page_row["polygon"].intersects(segment_row["polygon"]):
                             h_tag = segment_row["name"].split()[-1]
                             df_info_page.loc[page_index, "function"] = h_tag
-                        else:
-                            df_info_page.loc[page_index, "function"] = h_tag
-                            page_row["function"] = h_tag
+
+                for index_page, row_page in df_info_page.iterrows():
+                    if not row_page["function"] and index_page != 0:
+                        df_info_page.loc[index_page, "function"] = df_info_page.loc[
+                            index_page - 1, "function"
+                        ]
+
             else:
                 for page_index, page_row in df_info_page.iterrows():
                     df_info_page.loc[page_index, "function"] = h_tag
@@ -308,10 +316,10 @@ class SqlToCsv:
 
         # Write bio file
 
-        with open(os.path.join(self.output_path, f"{book_id}.bio"), "a") as file:
+        with open(os.path.join(self.output_path, f"true_{book_id}.bio"), "a") as file:
             for row in bio_data:
                 file.write(f'{" ".join(str(word) for word in row)}\n')
-        with open(os.path.join(self.output_path, f"{book_id}.txt"), "a") as file:
+        with open(os.path.join(self.output_path, f"line_{book_id}.txt"), "a") as file:
             for row in bio_data:
                 file.write(f"{row[0]} ")
 
@@ -329,11 +337,10 @@ class SqlToCsv:
             "a8a73f3a-beae-4c5e-be09-7d038649e8b1",
         ]
         for book in tqdm(list_book):
-            # self.save_bio(book, lit_function)
+            self.save_bio(book, lit_function)
             self.save_book_complete(book)
 
         self.get_text_segment_complete_fully(lit_function, list_book)
-        logging.info("txt")
 
     def save_all_books(self):
         """Save all the book (page id and transcription) in their respective csv named 'id_book'.csv"""
