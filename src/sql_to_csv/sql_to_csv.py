@@ -71,7 +71,6 @@ class SqlToCsv:
             f"select text, sel.polygon from transcription inner join (select id, polygon from element where id in (select child_id from element_path where parent_id='{page_id}')and type='paragraph' order by polygon) as sel on transcription.element_id=sel.id"
         )
         df = pd.DataFrame(self.cursor.fetchall(), columns=["text", "polygon"])
-        # df.to_csv(os.path.join(self.output_path, f"aaa{page_id}.csv"))
 
         return self.get_transcription_double_page_df(df)
 
@@ -185,99 +184,113 @@ class SqlToCsv:
                     )
                     file.write(trans)
 
-    def save_bio(self, book_id, lit_function):
-        logging.info(book_id)
-        # Get list page
+    @staticmethod
+    def normalize_txt(txt):
+        txt = txt.replace("\xa0", " ")
+        txt = txt.replace("j", "i")
+        txt = txt.replace("J", "I")
+        txt = "".join(txt)
+        txt = txt.replace("v", "u")
+        txt = txt.replace("V", "U")
+        txt = txt.replace("ë", "e")
+        txt = txt.replace("Ë", "E")
+        txt = txt.replace("æ", "e")
+        txt = txt.replace("Æ", "E")
+        txt = txt.replace("œ", "e")
+        txt = txt.replace("Œ", "E")
+        return txt
+
+    def save_bio_and_line(self, book_id, lit_function):
+        """Save bio file for the 10 fully annotated volume and export also the text with a line fetching"""
+        # Get pages
         self.get_list_page(book_id)
 
-        # Initiate function
-        h_tag = "none"
-
-        # Initiate the volume dataframe
+        # Create dataframe for the whole volume
         df_volume = pd.DataFrame(columns=["id", "function", "page"])
 
-        # Get the text in the pages
-        for row in self.list_page_id:
-            # Find text page
+        # Add h_tag at each page that has text_segment
+        for page in self.list_page_id:
+            id_page = page[0]
+            nb_page = page[1] + 1
+
+            # Create dataframe for the text_line in the page
             self.cursor.execute(
-                f"select id, polygon from element where id in (select child_id from element_path where parent_id='{row[0]}') and type='text_line'"
+                f"select id, polygon from element where id in (select child_id from element_path where parent_id='{id_page}') and type='text_line'"
             )
-            df_info_page = pd.DataFrame(
+            df_text_lines = pd.DataFrame(
                 data=self.cursor.fetchall(), columns=["id", "polygon"]
             )
 
-            # Turn the polygon into shapes
-            df_info_page["polygon"] = df_info_page.polygon.apply(
+            # Turn polygon into shape
+            df_text_lines["polygon"] = df_text_lines.polygon.apply(
                 lambda x: Polygon(ast.literal_eval(str(x)))
             )
 
-            # Order the text lines
-            df_info_page["y_axis"] = df_info_page.polygon.apply(lambda a: a.centroid.y)
-            df_info_page = df_info_page.sort_values(by=["y_axis"])
-            df_info_page = df_info_page.reset_index(drop=True)
-
-            # Find text segment
-            self.cursor.execute(
-                f"select name, polygon from element where id in (select child_id from element_path where parent_id = '{row[0]}') and type='text_segment'"
+            # Order the text_line with y coordinate of the center of polygon
+            df_text_lines["y_axis"] = df_text_lines.polygon.apply(
+                lambda a: a.centroid.y
             )
-            df_info_segment = pd.DataFrame(
+            df_text_lines = df_text_lines.sort_values(by=["y_axis"])
+            df_text_lines = df_text_lines.reset_index(drop=True)
+
+            # Add column for liturgical function
+            df_text_lines["function"] = ""
+
+            # Find text_segment in the page
+            self.cursor.execute(
+                f"select name, polygon from element where id in (select child_id from element_path where parent_id='{id_page}') and type='text_segment'"
+            )
+
+            # Create dataframe for text_segment
+            df_text_segment = pd.DataFrame(
                 data=self.cursor.fetchall(), columns=["name", "polygon"]
             )
 
-            # Add a function column
-            df_info_page["function"] = ""
-
-            # Match the text segment in the text
-            if df_info_segment["polygon"].any():
-                # Turn the polygon into shape
-                df_info_segment["polygon"] = df_info_segment.polygon.apply(
+            # Check if there is text_segment
+            if not df_text_segment.empty:
+                # Turn polygon into shape
+                df_text_segment["polygon"] = df_text_segment.polygon.apply(
                     lambda x: Polygon(ast.literal_eval(str(x)))
                 )
 
-                # Check which segment belong in which line
-                # df_info_page = df_info_page.sort_values(by=["y_axis"])
+                # Order text_segment
+                df_text_segment["y_axis"] = df_text_segment.polygon.apply(
+                    lambda a: a.centroid.y
+                )
+                df_text_segment = df_text_segment.sort_values(by=["y_axis"])
+                df_text_segment = df_text_segment.reset_index(drop=True)
 
-                for segment_index, segment_row in df_info_segment.iterrows():
-                    for page_index, page_row in df_info_page.iterrows():
-                        # Search if the segment belongs to the line
+                for index_segment, row_segment in df_text_segment.iterrows():
+                    for index_line, row_line in df_text_lines.iterrows():
+                        if row_line["polygon"].intersects(row_segment["polygon"]):
+                            df_text_lines.loc[index_line, "function"] = row_segment[
+                                "name"
+                            ].split()[-1]
 
-                        if page_row["polygon"].intersects(segment_row["polygon"]):
-                            h_tag = segment_row["name"].split()[-1]
-                            df_info_page.loc[page_index, "function"] = h_tag
-
-                for index_page, row_page in df_info_page.iterrows():
-                    if not row_page["function"] and index_page != 0:
-                        df_info_page.loc[index_page, "function"] = df_info_page.loc[
-                            index_page - 1, "function"
-                        ]
-
-            else:
-                for page_index, page_row in df_info_page.iterrows():
-                    df_info_page.loc[page_index, "function"] = h_tag
-
-            # Add name of page
-            df_info_page["page"] = row[1]
-
-            # Append the data in the volume df
-            columns = ["id", "function", "page"]
-            df_volume = df_volume.append(df_info_page[columns])
-
-        # Add a column for the text
-        df_volume["text"] = ""
-
-        # Get transcription
-        for index, row in df_volume.iterrows():
-            self.cursor.execute(
-                f"""select text from transcription where element_id = '{row["id"]}';"""
+            # Add the number of the page to the dataframe
+            df_text_lines["page"] = nb_page
+            # Add to the dataframe of the volume
+            df_volume = pd.concat(
+                [df_volume, df_text_lines[["id", "function", "page"]]],
+                ignore_index=True,
             )
-            text = self.cursor.fetchall()
-            if text:
-                row["text"] = text[0][0]
 
-        # Review if there is a liturgical function
+        # Initialize the dataframe if it doesn't begin with a function
+        if df_volume.loc[0, "function"] == "":
+            df_volume.loc[0, "function"] = "none"
+
+        # Complete the empty row with missing value
+        for index_volume, row_volume in df_volume.iterrows():
+            if index_volume != 0 and row_volume["function"] == "":
+                df_volume.loc[index_volume, "function"] = df_volume.loc[
+                    index_volume - 1, "function"
+                ]
+
+        # Remove the liturgical function that are not asked
         if lit_function:
             logging.info(lit_function)
-            # Get the name of the wanted text
+
+            # Find the liturgical function that are accepted
             self.cursor.execute(
                 f"select name from element where id in (select child_id from element_path where parent_id in (select child_id from element_path where parent_id = '{book_id}')) and type = 'text_segment' and name like '%{lit_function}%'"
             )
@@ -296,9 +309,21 @@ class SqlToCsv:
                 if row["function"] not in np_h_tag:
                     row["function"] = "none"
         else:
-            logging.info("No lit function")
+            logging.info("No liturgical function")
 
-        # Table of bio information
+        # Add a column for the text
+        df_volume["text"] = ""
+
+        # Get transcription
+        for index, row in df_volume.iterrows():
+            self.cursor.execute(
+                f"""select text from transcription where element_id = '{row["id"]}';"""
+            )
+            text = self.cursor.fetchall()
+            if text:
+                row["text"] = text[0][0]
+
+        # Create bio tag
         bio_data = []
         function = ""
         for index, row in df_volume.iterrows():
@@ -314,14 +339,17 @@ class SqlToCsv:
                     bio_data.append([word, bio_tag])
                     function = row["function"]
 
-        # Write bio file
-
+        # Export bio file
         with open(os.path.join(self.output_path, f"true_{book_id}.bio"), "a") as file:
             for row in bio_data:
-                file.write(f'{" ".join(str(word) for word in row)}\n')
+                file.write(
+                    f'{" ".join(self.normalize_txt(str(word)) for word in row)}\n'
+                )
+
+        # Export line file
         with open(os.path.join(self.output_path, f"line_{book_id}.txt"), "a") as file:
             for row in bio_data:
-                file.write(f"{row[0]} ")
+                file.write(f"{self.normalize_txt(row[0])} ")
 
     def save_fully_annotated_books(self, lit_function):
         list_book = [
@@ -337,8 +365,8 @@ class SqlToCsv:
             "a8a73f3a-beae-4c5e-be09-7d038649e8b1",
         ]
         for book in tqdm(list_book):
-            self.save_bio(book, lit_function)
-            self.save_book_complete(book)
+            self.save_bio_and_line(book, lit_function)
+            # self.save_book_complete(book)
 
         self.get_text_segment_complete_fully(lit_function, list_book)
 
@@ -503,6 +531,12 @@ def main():
         required=False,
         default="n",
         help="Generate a metadata file with id of volume and name",
+    )
+    parser.add_argument(
+        "--normalize",
+        required=False,
+        action="store_true",
+        help="Normalize the text of the bio true",
     )
 
     args = vars(parser.parse_args())
