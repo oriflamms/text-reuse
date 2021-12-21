@@ -150,11 +150,51 @@ class CreatingHtml:
 
         # Create assert value
         ass_match_count = len(match)
-        count = 0
         list_save_name = []
-        for index, row in df_match.sort_values(
-            by="pos_text", ascending=False
-        ).iterrows():
+
+        # Order the overlap
+        count_overlap = 0
+        new_df_match = df_match.sort_values(
+            by="pos_text", ascending=False, ignore_index=True
+        )
+        list_new_pos = []
+        for index, row in new_df_match.iterrows():
+            if (
+                index != 0
+                and new_df_match.loc[index - 1, "pos_text"][0] < row["pos_text"][1]
+            ):
+                count_overlap += 1
+                if (
+                    new_df_match.loc[index - 1, "pos_text"][1]
+                    - new_df_match.loc[index - 1, "pos_text"][0]
+                    > row["pos_text"][1] - row["pos_text"][0]
+                ):
+                    list_new_pos.append(
+                        [
+                            index,
+                            [
+                                row["pos_text"][0],
+                                new_df_match.loc[index - 1, "pos_text"][0] - 1,
+                            ],
+                        ]
+                    )
+                else:
+                    list_new_pos.append(
+                        [
+                            index - 1,
+                            [
+                                row["pos_text"][1] + 1,
+                                new_df_match.loc[index - 1, "pos_text"][1],
+                            ],
+                        ]
+                    )
+
+        # Replacing the overlapping position
+        for i in list_new_pos:
+            new_df_match.loc[i[0], "pos_text"] = i[1]
+
+        # Configuring the text for the html
+        for index, row in new_df_match.iterrows():
             # Initiate the text of reference
             text_ref = ""
             # Check if the text hasn't already been treated
@@ -209,13 +249,13 @@ class CreatingHtml:
                 + "<mark>"
                 + text_raw[row["pos_text"][0] :]
             )
-            count += 1
+
             # Adding marks to the bio eval text
             # bio_text = bio_text[: row['pos_text'][0]] + '/' + bio_text
+
             bio_text = (
                 bio_text[: row["pos_text"][1]] + "/" + bio_text[row["pos_text"][1] :]
             )
-            count += 1
             bio_text = (
                 bio_text[: row["pos_text"][0]]
                 + f"{raw_name.split()[-1]}-"
@@ -260,6 +300,7 @@ class CreatingHtml:
             html_file.write(
                 f"<p>Parameter of the matche:<br> threshold: {self.threshold}, cutoff: {self.cutoff}, ngrams: {self.ngrams}</p>"
             )
+            html_file.write(f"<p>Number of overlapping match : {count_overlap}</p>")
             html_file.write(f"<h2>Text du volume</h2><p>{text_raw}</p>")
             html_file.write("</body></html>")
 
