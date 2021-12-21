@@ -146,32 +146,37 @@ class ReferenceTexts:
 def main():
     """Collect arguments and run."""
     parser = argparse.ArgumentParser(
-        description="Parse a heurist export and make stats",
+        description="Parse a heurist export and make stats, you can also specify a liturgical function ",
     )
     parser.add_argument(
+        "-f",
         "--file-heurist",
         help="path of the csv heurist file",
         required=True,
         type=Path,
     )
     parser.add_argument(
-        "--text-path",
-        help="path of the save files for the ref text named after their ID Arkindex",
+        "-o",
+        "--output-path",
+        help="path of the output files for the ref text named after their ID Arkindex",
         required=False,
         default=False,
         type=Path,
     )
     parser.add_argument(
+        "-l",
         "--liturgical-function",
         help="specifies the liturgical function of the reference's text. Case sensitive",
         required=False,
         default="",
     )
     parser.add_argument(
+        "-m",
         "--metadata-path",
-        help="path of the save file for metadata",
+        help="path of the output file for metadata",
         required=False,
         default="",
+        type=Path,
     )
 
     args = vars(parser.parse_args())
@@ -179,8 +184,8 @@ def main():
     f = ReferenceTexts(args["file_heurist"], args["liturgical_function"])
     f.get_statistics()
 
-    if args["text_path"] and args["liturgical_function"] != []:
-        f.write_in_txt(args["text_path"])
+    if args["output_path"] and args["liturgical_function"] != []:
+        f.write_in_txt(args["output_path"])
 
     if args["metadata_path"] and args["liturgical_function"]:
         f.write_metadata(args["metadata_path"])

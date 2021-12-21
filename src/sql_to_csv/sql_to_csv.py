@@ -489,51 +489,59 @@ class SqlToCsv:
 def main():
     """Collect arguments and run."""
     parser = argparse.ArgumentParser(
-        description="Take a sql file and return csv (default) or txt by file of the books",
+        description="Take a sql file and return csv (default) or txt by file of the books"
+        "For the fully annotated book from the complete base you can specify -a and also a liturgical function with -l",
     )
     parser.add_argument(
+        "-s",
         "--file-sql",
         help="path of the sqlite db",
         required=True,
         type=Path,
     )
     parser.add_argument(
+        "-a",
         "--fully-annotated",
         help="Extraction of only annotated volume",
         required=False,
         action="store_true",
     )
     parser.add_argument(
-        "--savefile-path",
+        "-o",
+        "--output-path",
         help="path where the files will be created",
         required=True,
         type=Path,
     )
     parser.add_argument(
+        "-f",
         "--output-format",
         help="choose between an export in csv or in txt",
         required=True,
     )
     parser.add_argument(
+        "-t",
         "--text-segment",
         required=False,
         help="Export a csv called 50mss_text_segment.csv with information of what volume contains what text segment (y/n)",
         default="n",
     )
     parser.add_argument(
+        "-m",
+        "--metadata-volume",
+        required=False,
+        default="n",
+        help="Generate a metadata file with id of volume and name",
+    )
+    parser.add_argument(
+        "-l",
         "--liturgical-function",
         help="specifies the liturgical function of the reference's text. Case sensitive",
         required=False,
         default="",
     )
     parser.add_argument(
-        "--gen-meta-vol",
-        required=False,
-        default="n",
-        help="Generate a metadata file with id of volume and name",
-    )
-    parser.add_argument(
-        "--normalize",
+        "-n" "--normalize",
         required=False,
         action="store_true",
         help="Normalize the text of the bio true",
@@ -541,7 +549,7 @@ def main():
 
     args = vars(parser.parse_args())
 
-    with SqlToCsv(args["file_sql"], args["savefile_path"]) as f:
+    with SqlToCsv(args["file_sql"], args["output_path"]) as f:
         # Get books fully annotated
         if args["fully_annotated"]:
             logging.info("FULLY ANNOTATED TRUE")
@@ -558,7 +566,7 @@ def main():
         # Save the csv of correspondence between volumes and the text specified
         if args["text_segment"] == "y":
             f.get_all_text_segment_psalm(args["liturgical_function"])
-        if args["gen_meta_vol"] == "y":
+        if args["metadata_volume"] == "y":
             f.get_meta_vol()
 
 
