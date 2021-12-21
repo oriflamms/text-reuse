@@ -21,13 +21,24 @@ DATE = datetime.today().strftime("%Y-%m-%d")
 
 class CreatingHtml:
     def __init__(
-        self, volume_path, references_path, metadata_path, output_path, normalize
+        self,
+        volume_path,
+        references_path,
+        metadata_path,
+        output_path,
+        normalize,
+        threshold,
+        cutoff,
+        ngrams,
     ):
         self.volumes = volume_path
         self.reference = references_path
         self.metadata_heurist = metadata_path
         self.output_path = output_path
         self.normalize = normalize
+        self.threshold = threshold
+        self.cutoff = cutoff
+        self.ngrams = ngrams
 
         logging.info(normalize)
 
@@ -47,7 +58,7 @@ class CreatingHtml:
         txt = txt.replace("Œ", "E")
         return txt
 
-    def getting_info(self, text1, text2, threshold, cutoff, ngrams, stops):
+    def getting_info(self, text1, text2, stops):
         texts1 = getFiles(text1)
         texts2 = getFiles(text2)
 
@@ -88,9 +99,9 @@ class CreatingHtml:
             myMatch = Matcher(
                 textObjA,
                 textObjB,
-                threshold=threshold,
-                cutoff=cutoff,
-                ngramSize=ngrams,
+                threshold=self.threshold,
+                cutoff=self.cutoff,
+                ngramSize=self.ngrams,
                 removeStopwords=stops,
             )
             myMatch.match()
@@ -102,7 +113,8 @@ class CreatingHtml:
 
     def new_interface(self, text, ref, df):
         # Prepare the list of match
-        match = self.getting_info(text, ref, 3, 0, 3, False)
+
+        match = self.getting_info(text, ref, False)
 
         # Organizing match
         list_match = []
@@ -245,6 +257,9 @@ class CreatingHtml:
             )
             html_file.write(f"<p>Number of recognised texts : {str(len(match))}</p>")
             html_file.write(f"<p>Number of match : {str(len(list_match))}</p>")
+            html_file.write(
+                f"<p>Parameter of the matche:<br> threshold: {self.threshold}, cutoff: {self.cutoff}, ngrams: {self.ngrams}</p>"
+            )
             html_file.write(f"<h2>Text du volume</h2><p>{text_raw}</p>")
             html_file.write("</body></html>")
 
@@ -430,12 +445,36 @@ def main():
         action="store_true",
     )
     parser.add_argument(
-        "-t",
-        "--true-bio-file",
+        "-b",
+        "--bio-file-true",
         help="Generate html for the ground truth volumes",
         type=Path,
         default=None,
         required=False,
+    )
+    parser.add_argument(
+        "-t",
+        "--threshold",
+        required=False,
+        default=3,
+        type=int,
+        help="Value of the threshold for the text matcher",
+    )
+    parser.add_argument(
+        "-c",
+        "--cutoff",
+        required=False,
+        default=5,
+        type=int,
+        help="Value of the cutoff for the text matcher",
+    )
+    parser.add_argument(
+        "-g",
+        "--ngrams",
+        required=False,
+        default=3,
+        type=int,
+        help="Value of the ngrams for the text matcher",
     )
 
     args = vars(parser.parse_args())
@@ -445,11 +484,14 @@ def main():
         str(args["metadata_heurist"]),
         PurePosixPath(args["output_html"]),
         args["normalize"],
+        args["threshold"],
+        args["cutoff"],
+        args["ngrams"],
     )
     creation.create_html()
 
-    if args["true_bio_file"]:
-        creation.create_html_bio(str(args["true_bio_file"]))
+    if args["bio_file_true"]:
+        creation.create_html_bio(str(args["bio_file_true"]))
 
 
 if __name__ == "__main__":
