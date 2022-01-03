@@ -73,14 +73,21 @@ def evaluation(pred_file, true_file, metadata_heurist, output_path, metadata_vol
 
     # apply classification report
     for index, row in new_df_true.iterrows():
+        name_volume = ""
         for row_v in meta_v:
             if row_v[0] == index:
                 name_volume = row_v[1]
-        print(f"For volume_id {index} and volume name: {name_volume}")
+
+        if name_volume:
+            print(f"For volume_id {index} and volume name: {name_volume}")
+        else:
+            print(f"For volume_id {index}")
         print(classification_report(row, new_df_pred.loc[index]))
 
     print("The classification report upon the whole dataframe")
     print(classification_report(new_df_true, new_df_pred, target_names=list_new_col))
+
+    # Multiple output classification report
 
     # Adding a line for the total
     df_new = pd.DataFrame(0, columns=list_new_col, index=["Total"])
@@ -90,6 +97,7 @@ def evaluation(pred_file, true_file, metadata_heurist, output_path, metadata_vol
         new_df_true.loc["Total", col] = new_df_true[col].sum()
         new_df_pred.loc["Total", col] = new_df_pred[col].sum()
 
+    # Export of the new csv
     new_df_true.to_csv(os.path.join(output_path, "result_pred.csv"), index=True)
     new_df_true.to_csv(os.path.join(output_path, "result_true.csv"), index=True)
 
