@@ -30,6 +30,7 @@ class CreatingHtml:
         threshold,
         cutoff,
         ngrams,
+        mindistance,
     ):
         self.volumes = volume_path
         self.reference = references_path
@@ -39,6 +40,7 @@ class CreatingHtml:
         self.threshold = threshold
         self.cutoff = cutoff
         self.ngrams = ngrams
+        self.minDistance = mindistance
 
         logging.info(normalize)
 
@@ -83,7 +85,7 @@ class CreatingHtml:
                         prevTextObjs[filename] = Text(
                             self.normalize_txt(texts[filename]), filename
                         )
-                        logging.info("Normalization Done")
+                        # logging.info("Normalization Done")
                     else:
                         prevTextObjs[filename] = Text(texts[filename], filename)
 
@@ -103,6 +105,7 @@ class CreatingHtml:
                 cutoff=self.cutoff,
                 ngramSize=self.ngrams,
                 removeStopwords=stops,
+                minDistance=self.minDistance,
             )
             myMatch.match()
 
@@ -135,7 +138,11 @@ class CreatingHtml:
             text_raw = file_text.read()
 
         # Copy text for bio file
-        bio_text = text_raw
+        tru_text = []
+        bio_text = []
+        for letter in text_raw:
+            bio_text.append([letter, "O"])
+            tru_text.append([letter, ""])
 
         # Read the metadata
         with open(self.metadata_heurist, newline="") as meta_file:
@@ -152,46 +159,63 @@ class CreatingHtml:
         ass_match_count = len(match)
         list_save_name = []
 
+        # Indicate position of beginning and end in the table of text
+        for index, row in df_match.iterrows():
+            # Get information from the metadata
+            for data in meta:
+                if data[0] == row["name_ref"]:
+                    h_tag = data[1].split()[-1]
+            # Add the tag
+            bio_text[row["pos_text"][0]][1] = f"B-{h_tag}"
+            bio_text[row["pos_text"][1]][1] = "E"
+
+        # Create the table with word and bio tag
+        tag = "O"
+        word = []
+        bio_list = []
+        for row in bio_text:
+            if row[0] == " ":
+                bio_list.append(["".join(word), tag])
+                if "B" in tag:
+                    tag = tag.replace("B", "I")
+                if "E" in row[1]:
+                    tag = "O"
+                word = []
+            else:
+                word.append(row[0])
+                if "B" in row[1]:
+                    tag = row[1]
+
+        with open(
+            os.path.join(
+                self.output_path,
+                f"line_{self.threshold}{self.cutoff}{self.ngrams}{self.minDistance}_{output_name}.bio",
+            ),
+            "a",
+        ) as file:
+            for row in bio_list:
+                file.write(f'{" ".join(row)}\n')
+
         # Order the overlap
         count_overlap = 0
         new_df_match = df_match.sort_values(
             by="pos_text", ascending=False, ignore_index=True
         )
-        list_new_pos = []
+        # list_new_pos = []
         for index, row in new_df_match.iterrows():
             if (
                 index != 0
                 and new_df_match.loc[index - 1, "pos_text"][0] < row["pos_text"][1]
             ):
                 count_overlap += 1
-                if (
-                    new_df_match.loc[index - 1, "pos_text"][1]
-                    - new_df_match.loc[index - 1, "pos_text"][0]
-                    > row["pos_text"][1] - row["pos_text"][0]
-                ):
-                    list_new_pos.append(
-                        [
-                            index,
-                            [
-                                row["pos_text"][0],
-                                new_df_match.loc[index - 1, "pos_text"][0] - 1,
-                            ],
-                        ]
-                    )
-                else:
-                    list_new_pos.append(
-                        [
-                            index - 1,
-                            [
-                                row["pos_text"][1] + 1,
-                                new_df_match.loc[index - 1, "pos_text"][1],
-                            ],
-                        ]
-                    )
+                # if new_df_match.loc[index - 1, "pos_text"][1] - new_df_match.loc[index - 1, "pos_text"][0] > row["pos_text"][1] - row["pos_text"][0]:
+                #    list_new_pos.append([index,[row["pos_text"][0], new_df_match.loc[index - 1, "pos_text"][0] - 1]])
+                # else:
+                #    list_new_pos.append([index - 1, [row["pos_text"][1] + 1, new_df_match.loc[index - 1, "pos_text"][1]]])
 
         # Replacing the overlapping position
-        for i in list_new_pos:
-            new_df_match.loc[i[0], "pos_text"] = i[1]
+        # for i in list_new_pos:
+        #    new_df_match.loc[i[0], "pos_text"] = i[1]
 
         # Configuring the text for the html
         for index, row in new_df_match.iterrows():
@@ -250,43 +274,43 @@ class CreatingHtml:
                 + text_raw[row["pos_text"][0] :]
             )
 
-            # Adding marks to the bio eval text
-            # bio_text = bio_text[: row['pos_text'][0]] + '/' + bio_text
-
-            bio_text = (
-                bio_text[: row["pos_text"][1]] + "/" + bio_text[row["pos_text"][1] :]
-            )
-            bio_text = (
-                bio_text[: row["pos_text"][0]]
-                + f"{raw_name.split()[-1]}-"
-                + bio_text[row["pos_text"][0] :]
-            )
-
             # Adding it in the evaluation dataframe
             df.loc[id_volume, raw_name.split()[-1]] = 1
 
-        # Create list of word with bio tag
-        tag = "O"
-        list_bio = []
-        for word in bio_text.split():
-            if "-" in word:
-                tag = f"B-{word.split('-')[0]}"
-                list_bio.append([word.split("-")[1], tag])
-            elif "B" in tag:
-                tag = tag.replace("B", "I")
-                list_bio.append([word, tag])
-            elif "/" in word:
-                list_bio.append([word.replace("/", ""), tag])
-                tag = "O"
-            else:
-                list_bio.append([word, tag])
-
-        assert ass_match_count == len(list_save_name)
+        print(ass_match_count)
+        print(len(list_save_name))
+        # assert ass_match_count == len(list_save_name)
         assert len(df_match) == len(list_match)
+
+        for index, row in new_df_match.iterrows():
+            tru_text[row["pos_text"][0]][1] = "B"
+            tru_text[row["pos_text"][1]][1] = "E"
+
+        word = []
+        text_html = ""
+        marker = ""
+        for row in tru_text:
+            if row[0] == " ":
+                if marker == "B":
+                    text_html += f"<mark>{''.join(word)} "
+                    marker = ""
+                elif row[1] == "E":
+                    text_html += f"{''.join(word)}</mark> "
+                else:
+                    text_html += f"{''.join(word)} "
+                word = []
+            else:
+                if row[1]:
+                    marker = "B"
+                word.append(row[0])
 
         # Create the html
         with open(
-            os.path.join(self.output_path, f"line_{output_name}.html"), "w"
+            os.path.join(
+                self.output_path,
+                f"ZZZline_{self.threshold}{self.cutoff}{self.ngrams}{self.minDistance}_{output_name}.html",
+            ),
+            "w",
         ) as html_file:
             html_file.write(
                 '<html><head><meta charset="UTF-8"><link rel="stylesheet" href="style.css"><title>Text Matcher</title></head><body>'
@@ -298,18 +322,11 @@ class CreatingHtml:
             html_file.write(f"<p>Number of recognised texts : {str(len(match))}</p>")
             html_file.write(f"<p>Number of match : {str(len(list_match))}</p>")
             html_file.write(
-                f"<p>Parameter of the matche:<br> threshold: {self.threshold}, cutoff: {self.cutoff}, ngrams: {self.ngrams}</p>"
+                f"<p>Parameter of the matche:<br> threshold: {self.threshold}, cutoff: {self.cutoff}, ngrams: {self.ngrams}, minDistance: {self.minDistance}</p>"
             )
             html_file.write(f"<p>Number of overlapping match : {count_overlap}</p>")
             html_file.write(f"<h2>Text du volume</h2><p>{text_raw}</p>")
             html_file.write("</body></html>")
-
-        # Write bio file
-        with open(
-            os.path.join(self.output_path, f"line_{output_name}.bio"), "a"
-        ) as file:
-            for row in list_bio:
-                file.write(f'{" ".join(row)}\n')
 
     def create_html(self):
         # Get the path of the text in the htmls
@@ -339,9 +356,15 @@ class CreatingHtml:
         df = df.set_axis(new_column, axis="columns")
 
         # Export the dataframe with a csv format
-        df.to_csv(os.path.join(self.output_path, "evaluation_df.csv"), index=True)
+        df.to_csv(
+            os.path.join(
+                self.output_path,
+                f"evaluation{self.threshold}{self.cutoff}{self.ngrams}_df.csv",
+            ),
+            index=True,
+        )
 
-    def create_html_bio(self, folder):
+    def create_html_from_bio(self, folder):
         logging.info("Creating html file from bio")
         list_bio_file = []
         if os.path.isdir(folder):
@@ -517,8 +540,17 @@ def main():
         type=int,
         help="Value of the ngrams for the text matcher",
     )
+    parser.add_argument(
+        "-d",
+        "--mindistance",
+        required=False,
+        default=8,
+        type=int,
+        help="Value of the ngrams for the text matcher",
+    )
 
     args = vars(parser.parse_args())
+
     creation = CreatingHtml(
         PurePosixPath(args["input_volumes"]).as_posix(),
         args["input_references"],
@@ -528,11 +560,29 @@ def main():
         args["threshold"],
         args["cutoff"],
         args["ngrams"],
+        args["mindistance"],
     )
+    """
+    for t in range(0, 8):
+        for c in range(0, 8):
+            for n in range(2, 8):
+                creation = CreatingHtml(
+                    PurePosixPath(args["input_volumes"]).as_posix(),
+                    args["input_references"],
+                    str(args["metadata_heurist"]),
+                    PurePosixPath(args["output_html"]),
+                    args["normalize"],
+                    t,
+                    c,
+                    n,
+                    args["mindistance"],
+                )
+                creation.create_html()
+    """
     creation.create_html()
 
     if args["bio_file_true"]:
-        creation.create_html_bio(str(args["bio_file_true"]))
+        creation.create_html_from_bio(str(args["bio_file_true"]))
 
 
 if __name__ == "__main__":
