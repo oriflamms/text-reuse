@@ -32,6 +32,7 @@ class CreatingHtml:
         ngrams,
         mindistance,
     ):
+        """Initiate the class"""
         self.volumes = volume_path
         self.reference = references_path
         self.metadata_heurist = metadata_path
@@ -46,6 +47,7 @@ class CreatingHtml:
 
     @staticmethod
     def normalize_txt(txt):
+        """Normalize the text so that it match a latin lecture"""
         txt = txt.replace("\xa0", " ")
         txt = txt.replace("j", "i")
         txt = txt.replace("J", "I")
@@ -61,6 +63,7 @@ class CreatingHtml:
         return txt
 
     def getting_info(self, text1, text2, stops):
+        """Apply the matching algorithm to the texts"""
         texts1 = getFiles(text1)
         texts2 = getFiles(text2)
 
@@ -115,6 +118,7 @@ class CreatingHtml:
         return list_object
 
     def new_interface(self, text, ref, df):
+        """Create a html and a bio file for a txt file"""
         # Prepare the list of match
 
         match = self.getting_info(text, ref, False)
@@ -138,11 +142,11 @@ class CreatingHtml:
             text_raw = file_text.read()
 
         # Copy text for bio file
-        tru_text = []
+        true_text = []
         bio_text = []
         for letter in text_raw:
             bio_text.append([letter, "O"])
-            tru_text.append([letter, ""])
+            true_text.append([letter, ""])
 
         # Read the metadata
         with open(self.metadata_heurist, newline="") as meta_file:
@@ -156,7 +160,6 @@ class CreatingHtml:
         volume_url = os.path.join(ARKINDEX_VOLUME_URL, id_volume)
 
         # Create assert value
-        ass_match_count = len(match)
         list_save_name = []
 
         # Indicate position of beginning and end in the table of text
@@ -201,21 +204,13 @@ class CreatingHtml:
         new_df_match = df_match.sort_values(
             by="pos_text", ascending=False, ignore_index=True
         )
-        # list_new_pos = []
+
         for index, row in new_df_match.iterrows():
             if (
                 index != 0
                 and new_df_match.loc[index - 1, "pos_text"][0] < row["pos_text"][1]
             ):
                 count_overlap += 1
-                # if new_df_match.loc[index - 1, "pos_text"][1] - new_df_match.loc[index - 1, "pos_text"][0] > row["pos_text"][1] - row["pos_text"][0]:
-                #    list_new_pos.append([index,[row["pos_text"][0], new_df_match.loc[index - 1, "pos_text"][0] - 1]])
-                # else:
-                #    list_new_pos.append([index - 1, [row["pos_text"][1] + 1, new_df_match.loc[index - 1, "pos_text"][1]]])
-
-        # Replacing the overlapping position
-        # for i in list_new_pos:
-        #    new_df_match.loc[i[0], "pos_text"] = i[1]
 
         # Configuring the text for the html
         for index, row in new_df_match.iterrows():
@@ -277,28 +272,33 @@ class CreatingHtml:
             # Adding it in the evaluation dataframe
             df.loc[id_volume, raw_name.split()[-1]] = 1
 
-        print(ass_match_count)
-        print(len(list_save_name))
-        # assert ass_match_count == len(list_save_name)
+        # Assert that all matches where treated
         assert len(df_match) == len(list_match)
 
+        # Indication of the beginning and the end of each match
         for index, row in new_df_match.iterrows():
-            tru_text[row["pos_text"][0]][1] = "B"
-            tru_text[row["pos_text"][1]][1] = "E"
+            true_text[row["pos_text"][0]][1] = "B"
+            true_text[row["pos_text"][1]][1] = "E"
 
         word = []
         text_html = ""
         marker = ""
-        for row in tru_text:
+        # Adding the html marking at the beginning and the mark of end and beginning
+        for row in true_text:
+            # For each space the work is reassembled and a marking is added if necessary
             if row[0] == " ":
+                # Adding beginning marking and the word
                 if marker == "B":
                     text_html += f"<mark>{''.join(word)} "
                     marker = ""
+                # Adding ending marking and the word
                 elif row[1] == "E":
                     text_html += f"{''.join(word)}</mark> "
+                # Adding only the word
                 else:
                     text_html += f"{''.join(word)} "
                 word = []
+            # Complete the word letter by letter while there is no space
             else:
                 if row[1]:
                     marker = "B"
@@ -329,6 +329,7 @@ class CreatingHtml:
             html_file.write("</body></html>")
 
     def create_html(self):
+        """Handle the generation of html from txt file and the passing of arguments for one ou multiple input"""
         # Get the path of the text in the htmls
         texts = getFiles(self.volumes)
 
@@ -365,20 +366,25 @@ class CreatingHtml:
         )
 
     def create_html_from_bio(self, folder):
+        """Handle the generation of html from bio file and the passing of arguments for one ou multiple input"""
         logging.info("Creating html file from bio")
         list_bio_file = []
+        # Check if the path is a folder and create a list of path to each bio file
         if os.path.isdir(folder):
             list_bio_file = glob.glob(folder + "/**/*.bio", recursive=True)
         elif os.path.isfile(folder):
             list_bio_file = folder
 
         if not list_bio_file:
-            logging.info("no bio file found")
+            raise Exception("no bio file found")
 
+        # Applying the generation of html for all bio file found
         for file in list_bio_file:
             self.save_html_bio(file)
 
     def save_html_bio(self, bio_file):
+        """Create a html file from a bio file with indication to the referenced text"""
+
         # Read the file
         with open(bio_file, "r") as fd:
             data_raw = fd.readlines()
@@ -470,6 +476,7 @@ class CreatingHtml:
 
 
 def main():
+    """Takes arguments and run the program"""
     parser = argparse.ArgumentParser(
         description="Take a text and a repertory of text and find correspondence + generate evaluation.csv + generate bio file for each volume",
     )
