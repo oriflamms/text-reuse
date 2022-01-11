@@ -3,6 +3,7 @@
 
 import argparse
 import csv
+import glob
 import os
 from pathlib import Path
 
@@ -10,10 +11,49 @@ import pandas as pd
 
 
 class Compare:
-    def __init__(self, first_text, second_text, metadata, output_path):
-        self.first_text = self.read_bio(first_text, metadata)
-        self.second_text = self.read_bio(second_text, metadata)
+    def __init__(
+        self, first_text=None, second_text=None, metadata=None, output_path=None
+    ):
+        """Initializes the class and generates the htmls that correspond to the input path types"""
         self.output_path = output_path
+        self.name_output = None
+
+        # Check if the input are both directories and in that case create the html for each .bio file found
+        if os.path.isdir(first_text) and os.path.isdir(second_text):
+            print("Both directory")
+            self.first_list = glob.glob(str(first_text) + "/**/*.bio", recursive=True)
+            self.second_list = glob.glob(str(second_text) + "/**/*.bio", recursive=True)
+
+            for first_file in self.first_list:
+                for second_file in self.second_list:
+                    if (
+                        os.path.basename(first_file).split("_")[-1]
+                        == os.path.basename(second_file).split("_")[-1]
+                    ):
+                        self.name_output = f"{'_'.join([os.path.basename(second_file).split('_')[1], os.path.basename(second_file).split('_')[-1].replace('.bio', '')])}.html"
+                        self.first_text = self.read_bio(first_file, metadata)
+                        self.second_text = self.read_bio(second_file, metadata)
+                        self.align_text()
+
+            print(f"The files have been generated at {self.output_path}")
+
+        # Check if both of the input are the same type
+        elif os.path.isdir(first_text) ^ os.path.isdir(second_text):
+            if os.path.isdir(first_text):
+                print("Your first argument is a directory but not your second.")
+            else:
+                print("Your second argument is a directory but not your first")
+            raise Exception("Both of your argument must be the the same type")
+
+        # Generate the comparison html for one couple
+        else:
+            print("Both file")
+            self.name_output = "output.html"
+            self.first_text = self.read_bio(first_text, metadata)
+            self.second_text = self.read_bio(second_text, metadata)
+            self.align_text()
+
+            print(f"The file has been generated at {self.output_path}")
 
     def read_bio(self, bio_file, metadata):
         """Read a bio file and return a list of [WORD, TAG]"""
@@ -75,7 +115,7 @@ class Compare:
     def align_text(self):
         content = f' <div class="row"><div class="column">{self.first_text}</div><div class="column">{self.second_text}</div></div> '
 
-        with open(os.path.join(self.output_path, "test.html"), "w") as html_file:
+        with open(os.path.join(self.output_path, self.name_output), "w") as html_file:
             html_file.write(
                 '<html><head><meta charset="UTF-8"><link rel="stylesheet" href="com_style.css"><title>Align text</title></head><body>'
             )
@@ -94,14 +134,14 @@ def main():
     parser.add_argument(
         "-f",
         "--first-file",
-        help="First .bio file",
+        help="First .bio file. (True file)",
         type=Path,
         required=True,
     )
     parser.add_argument(
         "-s",
         "--second-file",
-        help="Second .bio file",
+        help="Second .bio file. (Matched file with a name like 'line_params_date_id-volume.bio)",
         type=Path,
         required=True,
     )
@@ -123,8 +163,7 @@ def main():
     args = vars(parser.parse_args())
     Compare(
         args["first_file"], args["second_file"], args["metadata"], args["output_path"]
-    ).align_text()
-    print(f'The file has been generated at {args["output_path"]}')
+    )
 
 
 if __name__ == "__main__":
