@@ -113,6 +113,7 @@ class Compare:
         return text_volume
 
     def align_text(self):
+        """Align two text side-by-side and export the html file"""
         content = f' <div class="row"><div class="column">{self.first_text}</div><div class="column">{self.second_text}</div></div> '
 
         with open(os.path.join(self.output_path, self.name_output), "w") as html_file:
