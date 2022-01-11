@@ -2,10 +2,11 @@
 # -*- coding: utf-8 -*-
 
 import argparse
-from pathlib import Path
-import pandas as pd
 import csv
 import os
+from pathlib import Path
+
+import pandas as pd
 
 
 class Compare:
@@ -36,9 +37,15 @@ class Compare:
                         ["end", index, df_bio.loc[index - 1, "bio_tag"].split("-")[1]]
                     )
                 nb_func += 1
-                list_index.append(["start", index, row["bio_tag"].split('-')[1]])
-            if index != 0 and row["bio_tag"] == 'O' and df_bio.loc[index - 1, "bio_tag"][0] == "I":
-                list_index.append(["end", index, df_bio.loc[index - 1, "bio_tag"].split("-")[1]])
+                list_index.append(["start", index, row["bio_tag"].split("-")[1]])
+            if (
+                index != 0
+                and row["bio_tag"] == "O"
+                and df_bio.loc[index - 1, "bio_tag"][0] == "I"
+            ):
+                list_index.append(
+                    ["end", index, df_bio.loc[index - 1, "bio_tag"].split("-")[1]]
+                )
 
         with open(metadata, newline="") as meta_file:
             data = list(csv.reader(meta_file, delimiter=","))
@@ -49,7 +56,9 @@ class Compare:
             if row[0] == "start":
                 for data_row in data:
                     if data_row[1].split()[-1] == row[2]:
-                        word_list.insert(row[1], (start_tag + f'<hov title="{data_row[1]}">'))
+                        word_list.insert(
+                            row[1], (start_tag + f'<hov title="{data_row[1]}">')
+                        )
                         if start_tag == "<marka>":
                             start_tag = "<markb>"
                             end_tag = "</hov></markb>"
@@ -58,7 +67,7 @@ class Compare:
                             end_tag = "</hov></marka>"
 
             elif row[0] == "end":
-                    word_list.insert(row[1], end_tag)
+                word_list.insert(row[1], end_tag)
 
         text_volume = f'<p>Number of recognised texts : {nb_func}<br>{" ".join(str(row) for row in word_list)}</p>'
         return text_volume
@@ -71,7 +80,9 @@ class Compare:
                 '<html><head><meta charset="UTF-8"><link rel="stylesheet" href="com_style.css"><title>Align text</title></head><body>'
             )
             html_file.write("<h1>Content</h1>")
-            html_file.write("<p>Hover on the highlighted text to see the referenced text<p>")
+            html_file.write(
+                "<p><marka><hov title='Just like that'>Hover on the highlighted text to see the referenced text</hov></marka><p>"
+            )
             html_file.write(f"<h2>Text du volume</h2>{content}")
             html_file.write("</body></html>")
 
@@ -106,11 +117,13 @@ def main():
         "--output-path",
         help="Path where the file will be generated",
         type=Path,
-        required=True
+        required=True,
     )
 
     args = vars(parser.parse_args())
-    Compare(args["first_file"], args["second_file"], args["metadata"], args["output_path"]).align_text()
+    Compare(
+        args["first_file"], args["second_file"], args["metadata"], args["output_path"]
+    ).align_text()
     print(f'The file has been generated at {args["output_path"]}')
 
 
