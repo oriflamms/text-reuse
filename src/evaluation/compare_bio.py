@@ -9,14 +9,25 @@ from pathlib import Path
 
 import pandas as pd
 
+ARKINDEX_VOLUME_URL = "https://arkindex.teklia.com/element/"
+
 
 class Compare:
     def __init__(
-        self, first_text=None, second_text=None, metadata=None, output_path=None
+        self,
+        first_text=None,
+        second_text=None,
+        heurist_metadata=None,
+        volume_metadata=None,
+        output_path=None,
     ):
         """Initializes the class and generates the htmls that correspond to the input path types"""
         self.output_path = output_path
         self.name_output = None
+
+        # Read the volume metadata
+        with open(volume_metadata, "r") as file:
+            self.volume_metadata = list(csv.reader(file, delimiter=","))
 
         # Check if the input are both directories and in that case create the html for each .bio file found
         if os.path.isdir(first_text) and os.path.isdir(second_text):
@@ -31,8 +42,8 @@ class Compare:
                         == os.path.basename(second_file).split("_")[-1]
                     ):
                         self.name_output = f"{'_'.join([os.path.basename(second_file).split('_')[1], os.path.basename(second_file).split('_')[-1].replace('.bio', '')])}.html"
-                        self.first_text = self.read_bio(first_file, metadata)
-                        self.second_text = self.read_bio(second_file, metadata)
+                        self.first_text = self.read_bio(first_file, heurist_metadata)
+                        self.second_text = self.read_bio(second_file, heurist_metadata)
                         self.align_text()
 
             print(f"The files have been generated at {self.output_path}")
@@ -49,8 +60,8 @@ class Compare:
         else:
             print("Both file")
             self.name_output = "output.html"
-            self.first_text = self.read_bio(first_text, metadata)
-            self.second_text = self.read_bio(second_text, metadata)
+            self.first_text = self.read_bio(first_text, heurist_metadata)
+            self.second_text = self.read_bio(second_text, heurist_metadata)
             self.align_text()
 
             print(f"The file has been generated at {self.output_path}")
@@ -114,17 +125,37 @@ class Compare:
 
     def align_text(self):
         """Align two text side-by-side and export the html file"""
+        # Fetch the volume reference and create the Arkindex url
+        ref_volume = ""
+        volume_url = ""
+        for row in self.volume_metadata:
+            if row[0] == self.name_output.split("_")[-1].replace(".html", ""):
+                ref_volume = row[1]
+                volume_url = os.path.join(ARKINDEX_VOLUME_URL, row[0])
+
+        # Fetch the information on the parameter of text matcher
+        threshold = self.name_output.split("_")[0][0]
+        cutoff = self.name_output.split("_")[0][1]
+        ngram = self.name_output.split("_")[0][2]
+        mindistance = self.name_output.split("_")[0][3:]
+
+        # Compose the side by side layout
         content = f' <div class="row"><div class="column">{self.first_text}</div><div class="column">{self.second_text}</div></div> '
 
+        # Write html file
         with open(os.path.join(self.output_path, self.name_output), "w") as html_file:
             html_file.write(
                 '<html><head><meta charset="UTF-8"><link rel="stylesheet" href="com_style.css"><title>Align text</title></head><body>'
             )
-            html_file.write("<h1>Content</h1>")
+            html_file.write("<center><h1>Content</h1>")
             html_file.write(
-                "<p><marka><hov title='Just like that'>Hover on the highlighted text to see the referenced text</hov></marka><p>"
+                "<p><marka><hov title='Just like that'>Hover on the highlighted text to see the referenced text</hov></marka><br>"
+                f"Volume references: {ref_volume}<br>"
+                f"<a href='{volume_url}'>Arkindex link</a><br>"
+                f"Text-Matcher parameter:<br>Threshold: {threshold} - Cutoff: {cutoff} - Ngrams: {ngram} - Mindistance: {mindistance}<br>"
+                f"Left text : True text | Right text : Matched text</p>"
             )
-            html_file.write(f"<h2>Text du volume</h2>{content}")
+            html_file.write(f"<h2>Text du volume</h2></center>{content}")
             html_file.write("</body></html>")
 
 
@@ -148,8 +179,15 @@ def main():
     )
     parser.add_argument(
         "-m",
-        "--metadata",
+        "--metadata-heurist",
         help="Metadata csv file from the Heurist base",
+        type=Path,
+        required=True,
+    )
+    parser.add_argument(
+        "-v",
+        "--volume-metadata",
+        help="Metadata csv file from the Arkindex base ([id,name])",
         type=Path,
         required=True,
     )
@@ -163,7 +201,11 @@ def main():
 
     args = vars(parser.parse_args())
     Compare(
-        args["first_file"], args["second_file"], args["metadata"], args["output_path"]
+        args["first_file"],
+        args["second_file"],
+        args["metadata_heurist"],
+        args["volume_metadata"],
+        args["output_path"],
     )
 
 
