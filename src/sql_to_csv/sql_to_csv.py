@@ -351,7 +351,7 @@ class SqlToCsv:
             for row in bio_data:
                 file.write(f"{self.normalize_txt(row[0])} ")
 
-    def save_fully_annotated_books(self, lit_function):
+    def save_fully_annotated_books(self, lit_function, empty_line):
         list_book = [
             "d1dd24a0-ca6a-4513-b86d-1d9547717c21",
             "beb498f0-3ae1-44f6-837d-94ec92eb0953",
@@ -366,7 +366,8 @@ class SqlToCsv:
         ]
         for book in tqdm(list_book):
             self.save_bio_and_line(book, lit_function)
-            # self.save_book_complete(book)
+            if empty_line:
+                self.collect_empty_transcription(book)
 
         self.get_text_segment_complete_fully(lit_function, list_book)
 
@@ -432,7 +433,7 @@ class SqlToCsv:
             index=True,
         )
 
-    def get_all_text_segment_psalm(self, liturgical_function):
+    def get_all_text_segment_func(self, liturgical_function):
         """
         Return a csv with all correspondence between a volume and the text of the liturgical function that can be found
         inside
@@ -485,6 +486,38 @@ class SqlToCsv:
             index=False,
         )
 
+    def collect_empty_transcription(self, id_book):
+        logging.info(f"Checking text_line for volume {id_book}")
+        self.get_list_page(id_book)
+
+        empty_transcription = [["id_page", "num_page", "id_text_line"]]
+
+        # Check for all the page of the volume
+        for id_page in self.list_page_id:
+            # Find ids of text_line from a page
+            self.cursor.execute(
+                f"select id from element where id in (select child_id from element_path where parent_id = '{id_page[0]}') and type='text_line'"
+            )
+
+            # Check if the text_line is empty for all text_line
+            for id_text_line in self.cursor.fetchall():
+                # Get the transcription from a text_line id
+                self.cursor.execute(
+                    f"select text from transcription where element_id='{id_text_line[0]}'"
+                )
+                if not self.cursor.fetchall():
+                    empty_transcription.append(
+                        [id_page[0], id_page[1], id_text_line[0]]
+                    )
+
+        with open(
+            os.path.join(self.output_path, f"empty-transcription_{id_book}.csv"),
+            "w",
+            newline="",
+        ) as f:
+            writer = csv.writer(f)
+            writer.writerows(empty_transcription)
+
 
 def main():
     """Collect arguments and run."""
@@ -523,14 +556,14 @@ def main():
         "-t",
         "--text-segment",
         required=False,
+        action="store_true",
         help="Export a csv called 50mss_text_segment.csv with information of what volume contains what text segment (y/n)",
-        default="n",
     )
     parser.add_argument(
         "-m",
         "--metadata-volume",
         required=False,
-        default="n",
+        action="store_true",
         help="Generate a metadata file with id of volume and name",
     )
     parser.add_argument(
@@ -541,19 +574,23 @@ def main():
         default="",
     )
     parser.add_argument(
-        "-n" "--normalize",
+        "-e",
+        "--empty-line",
+        help="Collect the text_line without transcription for the fully annotated book",
         required=False,
         action="store_true",
-        help="Normalize the text of the bio true",
     )
 
     args = vars(parser.parse_args())
 
     with SqlToCsv(args["file_sql"], args["output_path"]) as f:
+
         # Get books fully annotated
         if args["fully_annotated"]:
             logging.info("FULLY ANNOTATED TRUE")
-            f.save_fully_annotated_books(args["liturgical_function"])
+            f.save_fully_annotated_books(
+                args["liturgical_function"], args["empty_line"]
+            )
 
         # Get all the books
         else:
@@ -563,10 +600,11 @@ def main():
             # Save all the book in txt format in the folder specified
             elif args["output_format"] == "txt":
                 f.save_all_book_as_txt()
+
         # Save the csv of correspondence between volumes and the text specified
-        if args["text_segment"] == "y":
-            f.get_all_text_segment_psalm(args["liturgical_function"])
-        if args["metadata_volume"] == "y":
+        if args["text_segment"]:
+            f.get_all_text_segment_func(args["liturgical_function"])
+        if args["metadata_volume"]:
             f.get_meta_vol()
 
 
