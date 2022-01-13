@@ -31,6 +31,7 @@ class CreatingHtml:
         cutoff,
         ngrams,
         mindistance,
+        match_merger,
     ):
         """Initiate the class"""
         self.volumes = volume_path
@@ -42,6 +43,7 @@ class CreatingHtml:
         self.cutoff = cutoff
         self.ngrams = ngrams
         self.minDistance = mindistance
+        self.match_merger = match_merger
 
         logging.info(normalize)
 
@@ -188,6 +190,26 @@ class CreatingHtml:
                 word.append(row[0])
                 if "B" in row[1]:
                     tag = row[1]
+
+        # Merge match with the same tag if they are next to each other
+        if self.match_merger:
+            index_follow = []
+            # Collect the index that match
+            for index, word_tag in enumerate(bio_list):
+                if (
+                    index != 0
+                    and word_tag[1][0] == "B"
+                    and bio_list[index - 1][1][0] == "I"
+                ):
+                    if (
+                        word_tag[1].split("-")[1]
+                        == bio_list[index - 1][1].split("-")[1]
+                    ):
+                        index_follow.append(index)
+
+            # Elongate the match
+            for i in index_follow:
+                bio_list[i][1] = bio_list[i][1].replace("B", "I")
 
         with open(
             os.path.join(
@@ -524,6 +546,13 @@ def main():
         required=False,
     )
     parser.add_argument(
+        "-a",
+        "--match-merger",
+        help="Merge the match that are next to each other and have the same tag",
+        required=False,
+        action="store_true",
+    )
+    parser.add_argument(
         "-t",
         "--threshold",
         required=False,
@@ -568,6 +597,7 @@ def main():
         args["cutoff"],
         args["ngrams"],
         args["mindistance"],
+        args["match_merger"],
     )
     """
     for t in range(0, 8):
@@ -576,7 +606,7 @@ def main():
                 creation = CreatingHtml(
                     PurePosixPath(args["input_volumes"]).as_posix(),
                     args["input_references"],
-                    str(args["metadata_heurist"]),
+                    str(args["heurist_metadata"]),
                     PurePosixPath(args["output_html"]),
                     args["normalize"],
                     t,
