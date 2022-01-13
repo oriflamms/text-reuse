@@ -19,11 +19,20 @@ class Compare:
         second_text=None,
         heurist_metadata=None,
         volume_metadata=None,
+        reference_texts=None,
         output_path=None,
     ):
         """Initializes the class and generates the htmls that correspond to the input path types"""
         self.output_path = output_path
         self.name_output = None
+
+        # Check the folder of reference texts
+        if os.path.isdir(reference_texts):
+            self.reference_texts = glob.glob(
+                str(reference_texts) + "/**/*.txt", recursive=True
+            )
+        else:
+            raise Exception("Your path to the reference folder do not lead to a folder")
 
         # Read the volume metadata
         with open(volume_metadata, "r") as file:
@@ -103,12 +112,27 @@ class Compare:
 
         end_tag = "</hov></marka>"
         start_tag = "<marka>"
+
+        # for path in self.reference_texts:
+        #   print(os.path.basename(path).replace('.txt',''))
+
         for row in reversed(list_index):
             if row[0] == "start":
                 for data_row in data:
                     if data_row[1].split()[-1] == row[2]:
+                        text_ref = ""
+                        for ref_path in self.reference_texts:
+                            if data_row[0] == os.path.basename(ref_path).replace(
+                                ".txt", ""
+                            ):
+                                with open(os.path.join(ref_path), "r") as psalm_file:
+                                    text_ref = psalm_file.read()
                         word_list.insert(
-                            row[1], (start_tag + f'<hov title="{data_row[1]}">')
+                            row[1],
+                            (
+                                start_tag
+                                + f'<hov title="{data_row[1]} | Texte : {text_ref}">'
+                            ),
                         )
                         if start_tag == "<marka>":
                             start_tag = "<markb>"
@@ -192,6 +216,13 @@ def main():
         required=True,
     )
     parser.add_argument(
+        "-r",
+        "--reference",
+        help="Folder containing the reference texts",
+        type=Path,
+        required=True,
+    )
+    parser.add_argument(
         "-o",
         "--output-path",
         help="Path where the file will be generated",
@@ -205,6 +236,7 @@ def main():
         args["second_file"],
         args["metadata_heurist"],
         args["volume_metadata"],
+        args["reference"],
         args["output_path"],
     )
 
