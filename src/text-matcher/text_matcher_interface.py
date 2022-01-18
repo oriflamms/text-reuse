@@ -36,10 +36,7 @@ class CreatingHtml:
     ):
         """Initiate the class"""
         self.volumes = volume_path
-        if link_path:
-            self.link = getFiles(str(link_path))
-        else:
-            self.link = None
+        self.link = self.get_file_or_none(link_path)
         self.reference = references_path
         self.metadata_heurist = metadata_path
         self.output_path = output_path
@@ -54,6 +51,13 @@ class CreatingHtml:
         self.list_order_ref = []
 
         logging.info(normalize)
+
+    @staticmethod
+    def get_file_or_none(link_path):
+        if link_path:
+            return getFiles(str(link_path))
+        else:
+            return None
 
     @staticmethod
     def normalize_txt(txt):
@@ -166,15 +170,17 @@ class CreatingHtml:
         id_volume = os.path.basename(text).split("_")[-1].replace(".txt", "")
         output_name = "_".join([DATE, id_volume])
 
-        # Check if there is the link file
+        # Find and check the link file containing the page_id for each word
         if self.link:
-            path_link = None
-            for path in self.link:
-                if (
-                    os.path.basename(path).split("_")[-1].replace(".txt", "")
-                    == id_volume
-                ):
-                    path_link = path
+
+            path_match = [
+                path
+                for path in self.link
+                if os.path.basename(path).split("_")[-1].replace(".txt", "")
+                == id_volume
+            ]
+            assert len(path_match) == 1
+            path_link = path_match[0]
 
             # Read info for page
             if path_link:
@@ -409,7 +415,6 @@ class CreatingHtml:
             with open(os.path.join(self.output_path, "order_ref.csv"), "w") as csv_file:
                 csvWriter = csv.writer(csv_file, delimiter=",")
                 csvWriter.writerows(self.list_order_ref)
-                print(self.link)
 
         # Give proper name with h_tag to the column of the df
         new_column = []
