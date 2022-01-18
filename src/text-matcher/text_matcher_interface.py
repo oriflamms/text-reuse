@@ -173,12 +173,7 @@ class CreatingHtml:
         # Find and check the link file containing the page_id for each word
         if self.link:
 
-            path_match = [
-                path
-                for path in self.link
-                if os.path.basename(path).split("_")[-1].replace(".txt", "")
-                == id_volume
-            ]
+            path_match = [path for path in self.link if (id_volume in path)]
             assert len(path_match) == 1
             path_link = path_match[0]
 
