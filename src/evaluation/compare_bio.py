@@ -91,19 +91,27 @@ class Compare:
         list_index = []
         nb_func = 0
 
+        # Save the index and the type of the position (solo, beginning, end)
         for index, row in df_bio.iterrows():
+
+            # Except for the last row
             if index == len(df_bio) - 1:
                 pass
+
+            # Check if it is the start of the match
             elif row["bio_tag"][0] == "B":
+                # Check if the match will continue in the next row
                 if df_bio.loc[index + 1, "bio_tag"][0] == "I":
                     list_index.append(["start", index, row["bio_tag"].split("-")[1]])
 
+                # Check if the match has only one word
                 if (
                     df_bio.loc[index + 1, "bio_tag"] == "O"
                     or df_bio.loc[index + 1, "bio_tag"][0] == "B"
                 ):
                     list_index.append(["solo", index, row["bio_tag"].split("-")[1]])
 
+            # Check if the match is inside an entity and if it is the last word inside it
             elif row["bio_tag"][0] == "I" and (
                 df_bio.loc[index + 1, "bio_tag"] == "O"
                 or df_bio.loc[index + 1, "bio_tag"][0] == "B"
@@ -123,6 +131,8 @@ class Compare:
             if row[0] == "start" or row[0] == "solo":
                 for data_row in data:
                     if data_row[1].split()[-1] == row[2]:
+
+                        # Find the reference text for the match
                         text_ref = ""
                         for ref_path in self.reference_texts:
                             if data_row[0] == os.path.basename(ref_path).replace(
@@ -130,6 +140,8 @@ class Compare:
                             ):
                                 with open(os.path.join(ref_path), "r") as psalm_file:
                                     text_ref = psalm_file.read()
+
+                        # Apply the proper marking for a starting match
                         if row[0] == "start":
                             word_list.insert(
                                 row[1],
@@ -138,6 +150,8 @@ class Compare:
                                     + f'<hov title="{data_row[1]} | Texte : {text_ref}">'
                                 ),
                             )
+
+                        # Apply the proper marking for a solo match (only one word)
                         if row[0] == "solo":
                             word_list.insert(
                                 row[1],
@@ -147,6 +161,8 @@ class Compare:
                                     + end_tag
                                 ),
                             )
+
+                        # Change the color of the match for a better visibility
                         if start_tag == "<marka>":
                             start_tag = "<markb>"
                             end_tag = "</hov></markb>"
@@ -154,6 +170,7 @@ class Compare:
                             start_tag = "<marka>"
                             end_tag = "</hov></marka>"
 
+            # Apply the proper marking for the end ofa match
             elif row[0] == "end":
                 word_list.insert(row[1], end_tag)
 
