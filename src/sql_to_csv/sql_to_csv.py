@@ -14,6 +14,19 @@ import pandas as pd
 from shapely.geometry import Polygon
 from tqdm import tqdm
 
+FULLY_ANNOTATED_VOLUME = [
+    "d1dd24a0-ca6a-4513-b86d-1d9547717c21",
+    "beb498f0-3ae1-44f6-837d-94ec92eb0953",
+    "23071571-8dd6-4d88-8c42-82a03fe5b4d5",
+    "a1353358-dcb4-4968-977f-6cda8e65a3a4",
+    "2cf86092-20b7-4455-b90e-6deb9c8ce777",
+    "5c1d9d2b-7623-4168-8853-f4858d4ba39d",
+    "eecf5f36-b31b-4f90-b9ac-d2f263acc9ea",
+    "29f43007-92c8-4927-b048-fa75899b31e7",
+    "68d4ffae-a5e5-4069-a751-48b543d72c37",
+    "a8a73f3a-beae-4c5e-be09-7d038649e8b1",
+]
+
 
 class SqlToCsv:
     def __init__(self, file, output_path):
@@ -324,24 +337,12 @@ class SqlToCsv:
                 file.write(f"{self.normalize_txt(row[0])} ")
 
     def save_fully_annotated_books(self, lit_function, empty_line):
-        list_book = [
-            "d1dd24a0-ca6a-4513-b86d-1d9547717c21",
-            "beb498f0-3ae1-44f6-837d-94ec92eb0953",
-            "23071571-8dd6-4d88-8c42-82a03fe5b4d5",
-            "a1353358-dcb4-4968-977f-6cda8e65a3a4",
-            "2cf86092-20b7-4455-b90e-6deb9c8ce777",
-            "5c1d9d2b-7623-4168-8853-f4858d4ba39d",
-            "eecf5f36-b31b-4f90-b9ac-d2f263acc9ea",
-            "29f43007-92c8-4927-b048-fa75899b31e7",
-            "68d4ffae-a5e5-4069-a751-48b543d72c37",
-            "a8a73f3a-beae-4c5e-be09-7d038649e8b1",
-        ]
-        for book in tqdm(list_book):
+        for book in tqdm(FULLY_ANNOTATED_VOLUME):
             self.save_bio_and_line(book, lit_function)
             if empty_line:
                 self.collect_empty_transcription(book)
 
-        self.get_text_segment_complete(lit_function, list_book)
+        self.get_text_segment_complete(lit_function, FULLY_ANNOTATED_VOLUME)
 
     def get_text_segment_complete(self, liturgical_function, list_id_corpus):
         # Get the name of text segment with that are Psalm
@@ -352,10 +353,13 @@ class SqlToCsv:
         index = []
 
         # create an array with the good name for index and column
+        columns = [i[0] for i in self.cursor.fetchall()]
+        index = [i for i in list_id_corpus]
+        """
         for i in self.cursor.fetchall():
             columns.append(i[0])
         for i in list_id_corpus:
-            index.append(i)
+            index.append(i)"""
 
         # Creation of the dataframe filled with 0 and with the id of volume as row and the name of text segment as column
         df = pd.DataFrame(0, columns=columns, index=index)
@@ -430,19 +434,18 @@ class SqlToCsv:
     def managing_function(
         self, text_segment, metadata_volume, liturgical_function, empty_line
     ):
+        """Manage the export for the parameter given
+        Will export the transcription for all the volume in the database
+        Can export csv with id of the element without transcription
+        Can generate the metadata for the volumes"""
         self.get_list_book()
 
-        list_id_book = []
         for id_book in tqdm(self.list_book_id):
             print(id_book[0])
-            list_id_book.append(id_book[0])
             self.save_book_complete_para(id_book[0])
 
             if empty_line:
                 self.collect_empty_transcription(id_book[0])
-
-        if text_segment:
-            self.get_text_segment_complete(liturgical_function, list_id_book)
 
         if metadata_volume:
             self.get_meta_vol()
