@@ -14,6 +14,8 @@ import pandas as pd
 from shapely.geometry import Polygon
 from tqdm import tqdm
 
+EXPORT_TEXT_SEGMENT = "complete_text_segment.csv"
+
 FULLY_ANNOTATED_VOLUME = [
     "d1dd24a0-ca6a-4513-b86d-1d9547717c21",
     "beb498f0-3ae1-44f6-837d-94ec92eb0953",
@@ -347,19 +349,12 @@ class SqlToCsv:
     def get_text_segment_complete(self, liturgical_function, list_id_corpus):
         # Get the name of text segment with that are Psalm
         self.cursor.execute(
-            "select name from element where id in (select child_id from element_path where parent_id in (select child_id from element_path where parent_id in ('d1dd24a0-ca6a-4513-b86d-1d9547717c21','beb498f0-3ae1-44f6-837d-94ec92eb0953','23071571-8dd6-4d88-8c42-82a03fe5b4d5','a1353358-dcb4-4968-977f-6cda8e65a3a4','2cf86092-20b7-4455-b90e-6deb9c8ce777','5c1d9d2b-7623-4168-8853-f4858d4ba39d','eecf5f36-b31b-4f90-b9ac-d2f263acc9ea','29f43007-92c8-4927-b048-fa75899b31e7','68d4ffae-a5e5-4069-a751-48b543d72c37','a8a73f3a-beae-4c5e-be09-7d038649e8b1'))) and type = 'text_segment' and name like '%Psalm%' group by name;"
+            f"""select name from element where id in (select child_id from element_path where parent_id in (select child_id from element_path where parent_id in ('{"','".join(FULLY_ANNOTATED_VOLUME)}'))) and type = 'text_segment' and name like '%Psalm%' group by name;"""
         )
-        columns = []
-        index = []
 
         # create an array with the good name for index and column
         columns = [i[0] for i in self.cursor.fetchall()]
         index = [i for i in list_id_corpus]
-        """
-        for i in self.cursor.fetchall():
-            columns.append(i[0])
-        for i in list_id_corpus:
-            index.append(i)"""
 
         # Creation of the dataframe filled with 0 and with the id of volume as row and the name of text segment as column
         df = pd.DataFrame(0, columns=columns, index=index)
@@ -383,7 +378,7 @@ class SqlToCsv:
 
         # Extract the dataframe as a csv
         df.to_csv(
-            os.path.join(self.output_path, "complete_text_segment.csv"),
+            os.path.join(self.output_path, EXPORT_TEXT_SEGMENT),
             index=True,
         )
 
@@ -431,9 +426,7 @@ class SqlToCsv:
             writer = csv.writer(f)
             writer.writerows(empty_transcription)
 
-    def managing_function(
-        self, text_segment, metadata_volume, liturgical_function, empty_line
-    ):
+    def managing_function(self, metadata_volume, empty_line):
         """Manage the export for the parameter given
         Will export the transcription for all the volume in the database
         Can export csv with id of the element without transcription
@@ -522,9 +515,7 @@ def main():
 
         else:
             f.managing_function(
-                args["text_segment"],
                 args["metadata_volume"],
-                args["liturgical_function"],
                 args["empty_line"],
             )
 
