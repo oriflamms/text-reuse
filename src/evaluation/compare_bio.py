@@ -90,22 +90,25 @@ class Compare:
 
         list_index = []
         nb_func = 0
+
         for index, row in df_bio.iterrows():
-            if row["bio_tag"][0] == "B":
-                if index != 0 and df_bio.loc[index - 1, "bio_tag"][0] == "I":
-                    list_index.append(
-                        ["end", index, df_bio.loc[index - 1, "bio_tag"].split("-")[1]]
-                    )
-                nb_func += 1
-                list_index.append(["start", index, row["bio_tag"].split("-")[1]])
-            if (
-                index != 0
-                and row["bio_tag"] == "O"
-                and df_bio.loc[index - 1, "bio_tag"][0] == "I"
+            if index == len(df_bio) - 1:
+                pass
+            elif row["bio_tag"][0] == "B":
+                if df_bio.loc[index + 1, "bio_tag"][0] == "I":
+                    list_index.append(["start", index, row["bio_tag"].split("-")[1]])
+
+                if (
+                    df_bio.loc[index + 1, "bio_tag"] == "O"
+                    or df_bio.loc[index + 1, "bio_tag"][0] == "B"
+                ):
+                    list_index.append(["solo", index, row["bio_tag"].split("-")[1]])
+
+            elif row["bio_tag"][0] == "I" and (
+                df_bio.loc[index + 1, "bio_tag"] == "O"
+                or df_bio.loc[index + 1, "bio_tag"][0] == "B"
             ):
-                list_index.append(
-                    ["end", index, df_bio.loc[index - 1, "bio_tag"].split("-")[1]]
-                )
+                list_index.append(["end", index + 1, row["bio_tag"].split("-")[1]])
 
         with open(metadata, newline="") as meta_file:
             data = list(csv.reader(meta_file, delimiter=","))
@@ -117,7 +120,7 @@ class Compare:
         #   print(os.path.basename(path).replace('.txt',''))
 
         for row in reversed(list_index):
-            if row[0] == "start":
+            if row[0] == "start" or row[0] == "solo":
                 for data_row in data:
                     if data_row[1].split()[-1] == row[2]:
                         text_ref = ""
@@ -127,13 +130,23 @@ class Compare:
                             ):
                                 with open(os.path.join(ref_path), "r") as psalm_file:
                                     text_ref = psalm_file.read()
-                        word_list.insert(
-                            row[1],
-                            (
-                                start_tag
-                                + f'<hov title="{data_row[1]} | Texte : {text_ref}">'
-                            ),
-                        )
+                        if row[0] == "start":
+                            word_list.insert(
+                                row[1],
+                                (
+                                    start_tag
+                                    + f'<hov title="{data_row[1]} | Texte : {text_ref}">'
+                                ),
+                            )
+                        if row[0] == "solo":
+                            word_list.insert(
+                                row[1],
+                                (
+                                    start_tag
+                                    + f'<hov title="{data_row[1]} | Texte : {text_ref}">'
+                                    + end_tag
+                                ),
+                            )
                         if start_tag == "<marka>":
                             start_tag = "<markb>"
                             end_tag = "</hov></markb>"
