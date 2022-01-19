@@ -14,6 +14,21 @@ import pandas as pd
 from shapely.geometry import Polygon
 from tqdm import tqdm
 
+EXPORT_TEXT_SEGMENT = "complete_text_segment.csv"
+
+FULLY_ANNOTATED_VOLUME = [
+    "d1dd24a0-ca6a-4513-b86d-1d9547717c21",
+    "beb498f0-3ae1-44f6-837d-94ec92eb0953",
+    "23071571-8dd6-4d88-8c42-82a03fe5b4d5",
+    "a1353358-dcb4-4968-977f-6cda8e65a3a4",
+    "2cf86092-20b7-4455-b90e-6deb9c8ce777",
+    "5c1d9d2b-7623-4168-8853-f4858d4ba39d",
+    "eecf5f36-b31b-4f90-b9ac-d2f263acc9ea",
+    "29f43007-92c8-4927-b048-fa75899b31e7",
+    "68d4ffae-a5e5-4069-a751-48b543d72c37",
+    "a8a73f3a-beae-4c5e-be09-7d038649e8b1",
+]
+
 
 class SqlToCsv:
     def __init__(self, file, output_path):
@@ -63,7 +78,7 @@ class SqlToCsv:
             f"select child_id from element_path where parent_id='{page_id}')and type='paragraph' order by polygon)"
         )
         df = pd.DataFrame(self.cursor.fetchall(), columns=["text"])
-        return self.get_transcription_df_single_page(df)
+        return self.get_transcription_df_single_page_para(df)
 
     def get_transcription_double_page(self, page_id):
         """Get the transcription on a double page with the paragraph in order"""
@@ -72,10 +87,10 @@ class SqlToCsv:
         )
         df = pd.DataFrame(self.cursor.fetchall(), columns=["text", "polygon"])
 
-        return self.get_transcription_double_page_df(df)
+        return self.get_transcription_double_page_df_para(df)
 
     @staticmethod
-    def get_transcription_df_single_page(df):
+    def get_transcription_df_single_page_para(df):
         """Extract the transcription for single page"""
         transcription = ""
         for index, row in df.iterrows():
@@ -84,7 +99,7 @@ class SqlToCsv:
         return "".join(transcription)
 
     @staticmethod
-    def get_transcription_double_page_df(df):
+    def get_transcription_double_page_df_para(df):
         """Extract the transcription for double page"""
         df["polygon"] = df.polygon.apply(lambda x: Polygon(ast.literal_eval(str(x))))
         df["x_axis"] = df.polygon.apply(lambda a: a.centroid.x)  # order on which page
@@ -117,72 +132,43 @@ class SqlToCsv:
         )
         self.type_page = self.cursor.fetchall()[0][0]
 
-    # For 50_mss only
-    def check_type_page_from_book_id(self, book_id):
-        """Check the type of the page to apply the right get_transcription algorithm"""
-        self.cursor.execute(
-            f"select class_name from classification where element_id = '{book_id}'"
-        )
-        logging.info(book_id)
-        return self.cursor.fetchall()[0][0]
-
-    def save_book_as_csv(self, book_id):
-        """Save the book (page id and transcription) in a csv"""
-        logging.info(f"Saving {book_id}.csv")
-        with open(
-            os.path.join(self.output_path, f"{book_id}.csv"), "w"
-        ) as save_book_csv:
-            writer = csv.writer(save_book_csv)
-            self.list_page_id = self.get_list_page(book_id)
-            logging.info("looking for transcription")
-            type_page = self.check_type_page_from_book_id(book_id)
-            if type_page == "single_page":
-                for page_id in tqdm(self.list_page_id):
-                    page_id = page_id[0]
-                    trans = self.get_transcription_from_pageid_with_paragraph(page_id)
-                    writer.writerow([page_id, trans])
-            elif type_page == "double_page":
-                for page_id in tqdm(self.list_page_id):
-                    page_id = page_id[0]
-                    trans = self.get_transcription_double_page(page_id)
-                    writer.writerow([page_id, trans])
-
-    def save_book_as_txt(self, book_id):
-        """Save a book in a txt file"""
-        with open(os.path.join(self.output_path, f"{book_id}.txt"), "w") as file:
-            self.list_page_id = self.get_list_page(book_id)
-            type_page = self.check_type_page_from_book_id(book_id)
-            if type_page == "simple_page":
-                for page_id in self.list_page_id:
-                    trans = self.get_transcription_from_pageid_with_paragraph(
-                        page_id[0]
-                    )
-                    file.write(trans)
-            elif type_page == "double_page":
-                for page_id in self.list_page_id:
-                    trans = self.get_transcription_double_page(page_id[0])
-                    file.write(trans)
-                # logging.info(str(type_page))
-
-    def save_book_complete(self, book_id):
+    def save_book_complete_para(self, book_id):
         """Save book from complete corpus"""
+        list_word_id_page = []
         with open(os.path.join(self.output_path, f"para_{book_id}.txt"), "w") as file:
             self.list_page_id = self.get_list_page(book_id)
             self.check_type_page_from_book_id_complete(book_id)
+
+            # Extraction for single paged book
             if self.type_page == "single page":
                 for page_id in self.list_page_id:
                     trans = self.get_transcription_from_pageid_with_paragraph(
                         page_id[0]
                     )
                     file.write(trans)
+                    if trans:
+                        for word in trans.split():
+                            list_word_id_page.append([word, page_id[0]])
+
+            # Extraction for double paged book
             elif self.type_page == "double page":
-                # A changer quand la nouvelle extraction sera disponible
-                logging.info("tis but a false double paged book")
                 for page_id in self.list_page_id:
                     trans = self.get_transcription_from_pageid_with_paragraph(
                         page_id[0]
                     )
                     file.write(trans)
+                    if trans:
+                        for word in trans.split():
+                            list_word_id_page.append([word, page_id[0]])
+
+            else:
+                logging.info("The Digitization type is not regular")
+
+            with open(
+                os.path.join(self.output_path, f"idpage_{book_id}.txt"), "w", newline=""
+            ) as f:
+                writer = csv.writer(f)
+                writer.writerows(list_word_id_page)
 
     @staticmethod
     def normalize_txt(txt):
@@ -326,6 +312,7 @@ class SqlToCsv:
         # Create bio tag
         bio_data = []
         function = ""
+        bio_tag = ""
         for index, row in df_volume.iterrows():
             if row["text"]:
                 for word in row["text"].split():
@@ -352,60 +339,22 @@ class SqlToCsv:
                 file.write(f"{self.normalize_txt(row[0])} ")
 
     def save_fully_annotated_books(self, lit_function, empty_line):
-        list_book = [
-            "d1dd24a0-ca6a-4513-b86d-1d9547717c21",
-            "beb498f0-3ae1-44f6-837d-94ec92eb0953",
-            "23071571-8dd6-4d88-8c42-82a03fe5b4d5",
-            "a1353358-dcb4-4968-977f-6cda8e65a3a4",
-            "2cf86092-20b7-4455-b90e-6deb9c8ce777",
-            "5c1d9d2b-7623-4168-8853-f4858d4ba39d",
-            "eecf5f36-b31b-4f90-b9ac-d2f263acc9ea",
-            "29f43007-92c8-4927-b048-fa75899b31e7",
-            "68d4ffae-a5e5-4069-a751-48b543d72c37",
-            "a8a73f3a-beae-4c5e-be09-7d038649e8b1",
-        ]
-        for book in tqdm(list_book):
+        for book in tqdm(FULLY_ANNOTATED_VOLUME):
             self.save_bio_and_line(book, lit_function)
             if empty_line:
                 self.collect_empty_transcription(book)
 
-        self.get_text_segment_complete_fully(lit_function, list_book)
+        self.get_text_segment_complete(lit_function, FULLY_ANNOTATED_VOLUME)
 
-    def save_all_books(self):
-        """Save all the book (page id and transcription) in their respective csv named 'id_book'.csv"""
-        self.list_book_id = self.get_list_book()
-        for book_id in tqdm(self.list_book_id):
-            self.save_book_as_csv(book_id[0])
-
-    def save_some_book(self, nb_book):
-        """Save as much books as the function takes
-        You cannot choose the book you save"""
-        self.cursor.execute(
-            f"select * from element where type = 'volume' limit {str(nb_book)};"
-        )
-        list_book_id = self.cursor.fetchall()
-        for book_id in list_book_id:
-            self.save_book_as_csv(book_id[0])
-
-    def save_all_book_as_txt(self):
-        """Save all the book (page id and transcription) in their respective csv named 'id_book'.csv"""
-        self.list_book_id = self.get_list_book()
-        for book_id in tqdm(self.list_book_id):
-            self.save_book_as_txt(book_id[0])
-
-    def get_text_segment_complete_fully(self, liturgical_function, corpus):
+    def get_text_segment_complete(self, liturgical_function, list_id_corpus):
         # Get the name of text segment with that are Psalm
         self.cursor.execute(
-            "select name from element where id in (select child_id from element_path where parent_id in (select child_id from element_path where parent_id in ('d1dd24a0-ca6a-4513-b86d-1d9547717c21','beb498f0-3ae1-44f6-837d-94ec92eb0953','23071571-8dd6-4d88-8c42-82a03fe5b4d5','a1353358-dcb4-4968-977f-6cda8e65a3a4','2cf86092-20b7-4455-b90e-6deb9c8ce777','5c1d9d2b-7623-4168-8853-f4858d4ba39d','eecf5f36-b31b-4f90-b9ac-d2f263acc9ea','29f43007-92c8-4927-b048-fa75899b31e7','68d4ffae-a5e5-4069-a751-48b543d72c37','a8a73f3a-beae-4c5e-be09-7d038649e8b1'))) and type = 'text_segment' and name like '%Psalm%' group by name;"
+            f"""select name from element where id in (select child_id from element_path where parent_id in (select child_id from element_path where parent_id in ('{"','".join(FULLY_ANNOTATED_VOLUME)}'))) and type = 'text_segment' and name like '%Psalm%' group by name;"""
         )
-        columns = []
-        index = []
 
         # create an array with the good name for index and column
-        for i in self.cursor.fetchall():
-            columns.append(i[0])
-        for i in corpus:
-            index.append(i)
+        columns = [i[0] for i in self.cursor.fetchall()]
+        index = [i for i in list_id_corpus]
 
         # Creation of the dataframe filled with 0 and with the id of volume as row and the name of text segment as column
         df = pd.DataFrame(0, columns=columns, index=index)
@@ -429,54 +378,12 @@ class SqlToCsv:
 
         # Extract the dataframe as a csv
         df.to_csv(
-            os.path.join(self.output_path, "complete_text_segment.csv"),
-            index=True,
-        )
-
-    def get_all_text_segment_func(self, liturgical_function):
-        """
-        Return a csv with all correspondence between a volume and the text of the liturgical function that can be found
-        inside
-        """
-        # Get the name of text segment with that are Psalm
-        self.cursor.execute(
-            f"select name from element where id in (select child_id from element_path where parent_id in (select child_id from element_path where parent_id in (select id from element where type='volume'))) and type = 'text_segment' and name like '%{liturgical_function}%' group by name;"
-        )
-        columns = []
-        index = []
-        # create an array with the good name for index and column
-        for i in self.cursor.fetchall():
-            columns.append(i[0])
-        for i in self.get_list_book():
-            index.append(i[0])
-
-        # Creation of the dataframe filled with 0 and with the id of volume as row and the name of text segment as column
-        df = pd.DataFrame(0, columns=columns, index=index)
-
-        # Put a 1 in the dataframe if the volume contain the text segment
-        for index, row in df.iterrows():
-            # Find text segment for each volume
-            self.cursor.execute(
-                f"select name from element where id in (select child_id from element_path where parent_id in (select child_id from element_path where parent_id = '{index}')) and type = 'text_segment' and name like '%{liturgical_function}%';"
-            )
-            for i in self.cursor.fetchall():
-                if i[0] in df.columns:
-                    row[i[0]] = 1
-
-        new_column = []
-        for i in df.columns:
-            new_column.append(str(i).split()[-1])
-            # print(str(i).split()[-1])
-
-        df = df.set_axis(new_column, axis="columns")
-
-        # Extract the dataframe as a csv
-        df.to_csv(
-            os.path.join(self.output_path, "50mms_text_segment.csv"),
+            os.path.join(self.output_path, EXPORT_TEXT_SEGMENT),
             index=True,
         )
 
     def get_meta_vol(self):
+        """Generate the metadata for a corpus (complete)"""
         self.cursor.execute("select id, name from element where type = 'volume'")
         df_vol = pd.DataFrame.from_records(
             data=self.cursor.fetchall(), columns=["id", "name"]
@@ -487,6 +394,7 @@ class SqlToCsv:
         )
 
     def collect_empty_transcription(self, id_book):
+        """Collect the empty transcription text_line from a book"""
         logging.info(f"Checking text_line for volume {id_book}")
         self.get_list_page(id_book)
 
@@ -518,6 +426,23 @@ class SqlToCsv:
             writer = csv.writer(f)
             writer.writerows(empty_transcription)
 
+    def managing_function(self, metadata_volume, empty_line):
+        """Manage the export for the parameter given
+        Will export the transcription for all the volume in the database
+        Can export csv with id of the element without transcription
+        Can generate the metadata for the volumes"""
+        self.get_list_book()
+
+        for id_book in tqdm(self.list_book_id):
+            print(id_book[0])
+            self.save_book_complete_para(id_book[0])
+
+            if empty_line:
+                self.collect_empty_transcription(id_book[0])
+
+        if metadata_volume:
+            self.get_meta_vol()
+
 
 def main():
     """Collect arguments and run."""
@@ -527,17 +452,10 @@ def main():
     )
     parser.add_argument(
         "-s",
-        "--file-sql",
+        "--sql-file",
         help="path of the sqlite db",
         required=True,
         type=Path,
-    )
-    parser.add_argument(
-        "-a",
-        "--fully-annotated",
-        help="Extraction of only annotated volume",
-        required=False,
-        action="store_true",
     )
     parser.add_argument(
         "-o",
@@ -547,10 +465,11 @@ def main():
         type=Path,
     )
     parser.add_argument(
-        "-f",
-        "--output-format",
-        help="choose between an export in csv or in txt",
-        required=True,
+        "-a",
+        "--fully-annotated",
+        help="Extraction of only annotated volume, if not precised extraction on all the database",
+        required=False,
+        action="store_true",
     )
     parser.add_argument(
         "-t",
@@ -583,29 +502,22 @@ def main():
 
     args = vars(parser.parse_args())
 
-    with SqlToCsv(args["file_sql"], args["output_path"]) as f:
+    with SqlToCsv(args["sql_file"], args["output_path"]) as f:
+
+        # f.save_book_complete_para('6d6e6acd-393b-4f66-bdd5-4d9f06ad5c24')
 
         # Get books fully annotated
         if args["fully_annotated"]:
-            logging.info("FULLY ANNOTATED TRUE")
+            logging.info("Extraction for fully annotated book")
             f.save_fully_annotated_books(
                 args["liturgical_function"], args["empty_line"]
             )
 
-        # Get all the books
         else:
-            # Save all the book in csv format in the folder specified
-            if args["output_format"] == "csv":
-                f.save_all_books()
-            # Save all the book in txt format in the folder specified
-            elif args["output_format"] == "txt":
-                f.save_all_book_as_txt()
-
-        # Save the csv of correspondence between volumes and the text specified
-        if args["text_segment"]:
-            f.get_all_text_segment_func(args["liturgical_function"])
-        if args["metadata_volume"]:
-            f.get_meta_vol()
+            f.managing_function(
+                args["metadata_volume"],
+                args["empty_line"],
+            )
 
 
 if __name__ == "__main__":
