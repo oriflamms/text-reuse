@@ -23,6 +23,7 @@ class CreatingHtml:
     def __init__(
         self,
         volume_path,
+        link_path,
         references_path,
         metadata_path,
         output_path,
@@ -35,6 +36,7 @@ class CreatingHtml:
     ):
         """Initiate the class"""
         self.volumes = volume_path
+        self.link = self.get_file_or_none(link_path)
         self.reference = references_path
         self.metadata_heurist = metadata_path
         self.output_path = output_path
@@ -45,7 +47,17 @@ class CreatingHtml:
         self.minDistance = mindistance
         self.match_merger = match_merger
 
+        # List of ref text in order of apparition and link of arkindex for the page
+        self.list_order_ref = []
+
         logging.info(normalize)
+
+    @staticmethod
+    def get_file_or_none(link_path):
+        if link_path:
+            return getFiles(str(link_path))
+        else:
+            return None
 
     @staticmethod
     def normalize_txt(txt):
@@ -158,21 +170,39 @@ class CreatingHtml:
         id_volume = os.path.basename(text).split("_")[-1].replace(".txt", "")
         output_name = "_".join([DATE, id_volume])
 
+        # Find and check the link file containing the page_id for each word
+        if self.link:
+
+            path_match = [path for path in self.link if (id_volume in path)]
+            assert len(path_match) == 1
+            path_link = path_match[0]
+
+            # Read info for page
+            if path_link:
+                with open(path_link, newline="") as link_file:
+                    link_data = list(csv.reader(link_file, delimiter=","))
+
         # Get the Arkindex link
         volume_url = os.path.join(ARKINDEX_VOLUME_URL, id_volume)
 
         # Create assert value
         list_save_name = []
 
+        # List of ref text
+        list_ref = [f"ref_{id_volume}"]
+        list_link = [f"link_{id_volume}"]
+
         # Indicate position of beginning and end in the table of text
-        for index, row in df_match.iterrows():
+        for index, row in df_match.sort_values(by="pos_text").iterrows():
             # Get information from the metadata
             for data in meta:
                 if data[0] == row["name_ref"]:
                     h_tag = data[1].split()[-1]
+                    name_text = data[1].split("|")[-3]
             # Add the tag
             bio_text[row["pos_text"][0]][1] = f"B-{h_tag}"
             bio_text[row["pos_text"][1]][1] = "E"
+            list_ref.append(name_text)
 
         # Create the table with word and bio tag
         tag = "O"
@@ -216,10 +246,15 @@ class CreatingHtml:
                 self.output_path,
                 f"line_{self.threshold}{self.cutoff}{self.ngrams}{self.minDistance}_{output_name}.bio",
             ),
-            "a",
+            "w",
         ) as file:
-            for row in bio_list:
+            for i, row in enumerate(bio_list):
+                if row[1][0] == "B" and self.link:
+                    list_link.append(os.path.join(ARKINDEX_VOLUME_URL, link_data[i][1]))
                 file.write(f'{" ".join(row)}\n')
+
+        self.list_order_ref.append(list_ref)
+        self.list_order_ref.append(list_link)
 
         # Order the overlap
         count_overlap = 0
@@ -356,8 +391,8 @@ class CreatingHtml:
         texts = getFiles(self.volumes)
 
         # Creation of the column for the evaluation df
-        df = pd.read_csv(self.metadata_heurist)
-        columns = df["ID Annotation"].to_numpy()
+        eval_df = pd.read_csv(self.metadata_heurist)
+        columns = eval_df["ID Annotation"].to_numpy()
 
         # Creation if the index for the evaluation df
         index = []
@@ -365,21 +400,26 @@ class CreatingHtml:
             index.append(os.path.basename(filename).split("_")[-1].replace(".txt", ""))
 
         # Creation of the df
-        df = pd.DataFrame(0, columns=columns, index=index)
+        eval_df = pd.DataFrame(0, columns=columns, index=index)
 
         # Go through the volumes and apply text-matcher to them while creating html
         for filename in texts:
-            self.new_interface(str(filename), str(self.reference), df)
+            self.new_interface(str(filename), str(self.reference), eval_df)
+
+        if self.link:
+            with open(os.path.join(self.output_path, "order_ref.csv"), "w") as csv_file:
+                csvWriter = csv.writer(csv_file, delimiter=",")
+                csvWriter.writerows(self.list_order_ref)
 
         # Give proper name with h_tag to the column of the df
         new_column = []
-        for i in df.columns:
+        for i in eval_df.columns:
             new_column.append(str(i).split()[-1])
 
-        df = df.set_axis(new_column, axis="columns")
+        eval_df = eval_df.set_axis(new_column, axis="columns")
 
         # Export the dataframe with a csv format
-        df.to_csv(
+        eval_df.to_csv(
             os.path.join(
                 self.output_path,
                 f"evaluation{self.threshold}{self.cutoff}{self.ngrams}_df.csv",
@@ -391,6 +431,7 @@ class CreatingHtml:
         """Handle the generation of html from bio file and the passing of arguments for one ou multiple input"""
         logging.info("Creating html file from bio")
         list_bio_file = []
+
         # Check if the path is a folder and create a list of path to each bio file
         if os.path.isdir(folder):
             list_bio_file = glob.glob(folder + "/**/*.bio", recursive=True)
@@ -439,6 +480,7 @@ class CreatingHtml:
                     )
                 nb_func += 1
                 list_index.append(["start", index, row["h_tag"].split("-")[1]])
+
             # Check the index for the end in case it follow à O:
             if (
                 index != 0
@@ -510,6 +552,14 @@ def main():
         help="Path of the text of interest",
     )
     parser.add_argument(
+        "-l",
+        "--link-ref",
+        required=False,
+        type=Path,
+        default=None,
+        help="Folder of csv file where each word is associated with the id of its page (generated with sql_to_csv)",
+    )
+    parser.add_argument(
         "-r",
         "--input-references",
         required=True,
@@ -520,6 +570,7 @@ def main():
         "-m",
         "--metadata-heurist",
         type=Path,
+        default=None,
         help="File with the metadata to indicate the name of the recognised text",
         required=True,
     )
@@ -542,7 +593,6 @@ def main():
         "--bio-file-true",
         help="Generate html for the ground truth volumes",
         type=Path,
-        default=None,
         required=False,
     )
     parser.add_argument(
@@ -589,6 +639,7 @@ def main():
 
     creation = CreatingHtml(
         PurePosixPath(args["input_volumes"]).as_posix(),
+        args["link_ref"],
         args["input_references"],
         str(args["metadata_heurist"]),
         PurePosixPath(args["output_html"]),
@@ -599,23 +650,7 @@ def main():
         args["mindistance"],
         args["match_merger"],
     )
-    """
-    for t in range(0, 8):
-        for c in range(0, 8):
-            for n in range(2, 8):
-                creation = CreatingHtml(
-                    PurePosixPath(args["input_volumes"]).as_posix(),
-                    args["input_references"],
-                    str(args["heurist_metadata"]),
-                    PurePosixPath(args["output_html"]),
-                    args["normalize"],
-                    t,
-                    c,
-                    n,
-                    args["mindistance"],
-                )
-                creation.create_html()
-    """
+
     creation.create_html()
 
     if args["bio_file_true"]:
