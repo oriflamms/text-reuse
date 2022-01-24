@@ -538,6 +538,88 @@ class CreatingHtml:
             html_file.write(f"<h2>Text du volume</h2><p>{text_volume}</p>")
             html_file.write("</body></html>")
 
+    def ref_on_ref(self):
+        ref_files1 = getFiles(self.volumes)
+        ref_files2 = getFiles(str(self.reference))
+
+        # Read the metadata
+        with open(self.metadata_heurist, newline="") as meta_file:
+            meta = list(csv.reader(meta_file, delimiter=","))
+
+        for line in meta:
+            print(line)
+
+        ref_tab = []
+        list_nb_word_max = []
+        list_name_ref = []
+
+        for i, text1 in enumerate(ref_files1):
+            for ref in meta:
+                if ref[0] in text1:
+                    list_name_ref.append(ref[1].split("|")[-3])
+
+            ref_tab.append([])
+            for text2 in ref_files2:
+                if self.count_word_in_match(text1, text2):
+                    nb_word_matched = self.count_word_in_match(text1, text2)
+                    ref_tab[i].append(nb_word_matched)
+                else:
+                    ref_tab[i].append(0)
+                if text1 == text2:
+                    list_nb_word_max.append(nb_word_matched)
+
+        ratio_tab = []
+        for i, line in enumerate(ref_tab):
+            ratio_tab.append([])
+            for j, nb_word in enumerate(line):
+                if i < j:
+                    ratio_tab[i].append(round(nb_word / list_nb_word_max[j], 4))
+                if j < i:
+                    ratio_tab[i].append(round(nb_word / list_nb_word_max[i], 4))
+                if i == j:
+                    ratio_tab[i].append(1)
+
+        nb_word_df = pd.DataFrame(
+            data=ref_tab, index=list_name_ref, columns=list_name_ref
+        )
+        nb_word_df.to_csv(os.path.join(self.output_path, "nb_word.csv"), index=True)
+
+        ratio_df = pd.DataFrame(
+            data=ratio_tab, index=list_name_ref, columns=list_name_ref
+        )
+        ratio_df.to_csv(os.path.join(self.output_path, "ratio_word.csv"), index=True)
+
+    def count_word_in_match(self, text1, text2):
+        # Read the text of interest
+        with open(text1, "r") as file_text:
+            text_raw = file_text.read()
+
+        if text1 == text2:
+            return len(text_raw.split())
+
+        else:
+            list_match = self.getting_info(str(text1), str(text2), False)
+
+        if list_match:
+            # Copy text for placing beginning and end of match
+            char_text = []
+            for letter in text_raw:
+                char_text.append([letter, ""])
+
+            # Place the match
+            for match in list_match:
+                for intra_match in match[1]:
+                    for pos in range(intra_match[0], intra_match[1]):
+                        char_text[pos][1] = "I"
+
+            # Count the word in the match
+            wc = 0
+            for i, char in enumerate(char_text):
+                if char[0] == " " and char[1] == "I":
+                    wc += 1
+
+            return wc
+
 
 def main():
     """Takes arguments and run the program"""
@@ -651,7 +733,9 @@ def main():
         args["match_merger"],
     )
 
-    creation.create_html()
+    # creation.create_html()
+    if args["input_volumes"] == args["input_references"]:
+        creation.ref_on_ref()
 
     if args["bio_file_true"]:
         creation.create_html_from_bio(str(args["bio_file_true"]))
