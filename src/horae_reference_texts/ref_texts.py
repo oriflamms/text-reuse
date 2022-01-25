@@ -13,6 +13,8 @@ import pandas as pd
 
 pd.options.mode.chained_assignment = None  # default='warn'
 
+EXPORT_METADATA_NB = "metadata_nb_name.csv"
+
 
 class ReferenceTexts:
     def __init__(self, file, liturgical_function):
@@ -78,12 +80,12 @@ class ReferenceTexts:
             os.path.join(metadata_path, "metadata_heurist.csv"), index=False
         )
 
-    def write_nb_of_word_metadata(self, metadata_path):
+    def write_nb_of_word_metadata(self, metadata_path, export_name):
         name_nb_list = [
             [r["ID Annotation"].split()[-1], len(str(r["Text"]).split())]
             for i, r in self.df.iterrows()
         ]
-        with open(os.path.join(metadata_path, "metadata_nb_name.csv"), "w") as nb_file:
+        with open(os.path.join(metadata_path, export_name), "w") as nb_file:
             writer = csv.writer(nb_file)
             writer.writerows(name_nb_list)
 
@@ -207,7 +209,7 @@ def main():
         f.write_metadata(args["metadata_path"])
 
     if args["nb_word"] and args["liturgical_function"]:
-        f.write_nb_of_word_metadata(args["nb_word"])
+        f.write_nb_of_word_metadata(args["nb_word"], EXPORT_METADATA_NB)
 
 
 if __name__ == "__main__":
