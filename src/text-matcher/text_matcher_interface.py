@@ -65,7 +65,6 @@ class CreatingHtml:
         txt = txt.replace("\xa0", " ")
         txt = txt.replace("j", "i")
         txt = txt.replace("J", "I")
-        txt = "".join(txt)
         txt = txt.replace("v", "u")
         txt = txt.replace("V", "U")
         txt = txt.replace("ë", "e")
@@ -185,9 +184,6 @@ class CreatingHtml:
         # Get the Arkindex link
         volume_url = os.path.join(ARKINDEX_VOLUME_URL, id_volume)
 
-        # Create assert value
-        list_save_name = []
-
         # List of ref text
         list_ref = [f"ref_{id_volume}"]
         list_link = [f"link_{id_volume}"]
@@ -241,6 +237,18 @@ class CreatingHtml:
             for i in index_follow:
                 bio_list[i][1] = bio_list[i][1].replace("B", "I")
 
+        # Remove the same psalm that follow themselves
+        new_list_ref = []
+        for i, element in enumerate(list_ref):
+            if i != len(list_ref) - 1:
+                if list_ref[i + 1] == element:
+                    pass
+                else:
+                    new_list_ref.append(element)
+
+        # Replace the list of psalm
+        list_ref = new_list_ref
+
         with open(
             os.path.join(
                 self.output_path,
@@ -249,10 +257,12 @@ class CreatingHtml:
             "w",
         ) as file:
             for i, row in enumerate(bio_list):
+                # Add the match to the csv of match
                 if row[1][0] == "B" and self.link:
                     list_link.append(os.path.join(ARKINDEX_VOLUME_URL, link_data[i][1]))
                 file.write(f'{" ".join(row)}\n')
 
+        # Add info of match on list_order_ref to be exported
         self.list_order_ref.append(list_ref)
         self.list_order_ref.append(list_link)
 
@@ -269,103 +279,78 @@ class CreatingHtml:
             ):
                 count_overlap += 1
 
-        # Configuring the text for the html
-        for index, row in new_df_match.iterrows():
-            # Initiate the text of reference
-            text_ref = ""
-            # Check if the text hasn't already been treated
-            if row["name_ref"] not in list_save_name:
-                # List the treated reference text
-                list_save_name.append(row["name_ref"])
+        # HTML Creation
+        start_tag = "<mark>"
+        end_tag = "</mark>"
+        html_text = ""
+        list_save_ref = []
+        for i, word in enumerate(bio_list):
+            if i == len(bio_list) - 1:
+                pass
+            elif word[1] == "O":
+                html_text += word[0] + " "
+            elif word[1][0] == "B":
+                # Adding the ref text in the merge with highlight on matched words
+                text_ref = ""
+                # Check if the text hasn't already been treated
+                if word[1].split("-")[1] not in list_save_ref:
+                    # List the treated reference text
+                    list_save_ref.append(word[1].split("-")[1])
 
-                # Get information from the metadata
-                for data in meta:
-                    if data[0] == row["name_ref"]:
-                        raw_name = data[1]
-                        heurist_name = f"<b>{data[1]}</b><br>"
+                    # Get information from the metadata
+                    id_ref = ""
+                    heurist_name = ""
+                    for data in meta:
+                        if word[1].split("-")[1] in data[1]:
+                            heurist_name = f"<b>{data[1]}</b><br>"
+                            id_ref = data[0]
 
-                # Sort a dataframe containing the proper information on the reference text
-                df_name = df_match[df_match["name_ref"] == row["name_ref"]]
+                    # Sort a dataframe containing the proper information on the reference text
+                    df_name = df_match[df_match["name_ref"] == id_ref]
 
-                # Get the reference text
-                with open(
-                    os.path.join(ref, f"{row['name_ref']}.txt"), "r"
-                ) as psalm_file:
-                    text_ref = self.normalize_txt(psalm_file.read())
+                    # Get the reference text
+                    with open(os.path.join(ref, f"{id_ref}.txt"), "r") as psalm_file:
+                        text_ref = self.normalize_txt(psalm_file.read())
 
-                # Add the proper tag to the reference text
-                for index_name, row_name in df_name.sort_values(
-                    by="pos_ref", ascending=False
-                ).iterrows():
+                    # Add the proper tag to the reference text
+                    for index_name, row_name in df_name.sort_values(
+                        by="pos_ref", ascending=False
+                    ).iterrows():
+                        text_ref = (
+                            text_ref[: row_name["pos_ref"][1]]
+                            + "</mark>"
+                            + text_ref[row_name["pos_ref"][1] :]
+                        )
+                        text_ref = (
+                            text_ref[: row_name["pos_ref"][0]]
+                            + "<mark>"
+                            + text_ref[row_name["pos_ref"][0] :]
+                        )
+
+                    # Adding the final tag
                     text_ref = (
-                        text_ref[: row_name["pos_ref"][1]]
-                        + "</mark>"
-                        + text_ref[row_name["pos_ref"][1] :]
-                    )
-                    text_ref = (
-                        text_ref[: row_name["pos_ref"][0]]
-                        + "<mark>"
-                        + text_ref[row_name["pos_ref"][0] :]
+                        '<span class="marginnote">'
+                        + heurist_name
+                        + text_ref
+                        + "</span>"
                     )
 
-                # Adding the final tag
-                text_ref = (
-                    '<span class="marginnote">' + heurist_name + text_ref + "</span>"
-                )
-
-            # Adding the proper tagging
-            text_raw = (
-                text_raw[: row["pos_text"][1]]
-                + "</mark>"
-                + text_raw[row["pos_text"][1] :]
-            )
-            text_raw = (
-                text_raw[: row["pos_text"][0]]
-                + text_ref
-                + "<mark>"
-                + text_raw[row["pos_text"][0] :]
-            )
-
-            # Adding it in the evaluation dataframe
-            df.loc[id_volume, raw_name.split()[-1]] = 1
+                html_text += text_ref + start_tag + word[0] + " "
+                if bio_list[i + 1][1][0] == "B":
+                    html_text += end_tag
+            elif word[1][0] == "I":
+                html_text += word[0] + " "
+                if bio_list[i + 1][1][0] != "I":
+                    html_text += end_tag
 
         # Assert that all matches where treated
         assert len(df_match) == len(list_match)
 
-        # Indication of the beginning and the end of each match
-        for index, row in new_df_match.iterrows():
-            true_text[row["pos_text"][0]][1] = "B"
-            true_text[row["pos_text"][1]][1] = "E"
-
-        word = []
-        text_html = ""
-        marker = ""
-        # Adding the html marking at the beginning and the mark of end and beginning
-        for row in true_text:
-            # For each space the work is reassembled and a marking is added if necessary
-            if row[0] == " ":
-                # Adding beginning marking and the word
-                if marker == "B":
-                    text_html += f"<mark>{''.join(word)} "
-                    marker = ""
-                # Adding ending marking and the word
-                elif row[1] == "E":
-                    text_html += f"{''.join(word)}</mark> "
-                # Adding only the word
-                else:
-                    text_html += f"{''.join(word)} "
-                word = []
-            # Complete the word letter by letter while there is no space
-            else:
-                if row[1]:
-                    marker = "B"
-                word.append(row[0])
-
-        # Create the html
+        # Writing in html file
         with open(
             os.path.join(
                 self.output_path,
-                f"ZZZline_{self.threshold}{self.cutoff}{self.ngrams}{self.minDistance}_{output_name}.html",
+                f"Zline_{self.threshold}{self.cutoff}{self.ngrams}{self.minDistance}_{output_name}.html",
             ),
             "w",
         ) as html_file:
@@ -379,10 +364,10 @@ class CreatingHtml:
             html_file.write(f"<p>Number of recognised texts : {str(len(match))}</p>")
             html_file.write(f"<p>Number of match : {str(len(list_match))}</p>")
             html_file.write(
-                f"<p>Parameter of the matche:<br> threshold: {self.threshold}, cutoff: {self.cutoff}, ngrams: {self.ngrams}, minDistance: {self.minDistance}</p>"
+                f"<p>Parameters of the match:<br> threshold: {self.threshold}, cutoff: {self.cutoff}, ngrams: {self.ngrams}, minDistance: {self.minDistance}</p>"
             )
             html_file.write(f"<p>Number of overlapping match : {count_overlap}</p>")
-            html_file.write(f"<h2>Text du volume</h2><p>{text_raw}</p>")
+            html_file.write(f"<h2>Text du volume</h2><p>{html_text}</p>")
             html_file.write("</body></html>")
 
     def create_html(self):
@@ -733,7 +718,8 @@ def main():
         args["match_merger"],
     )
 
-    # creation.create_html()
+    creation.create_html()
+
     if args["input_volumes"] == args["input_references"]:
         creation.ref_on_ref()
 
