@@ -79,6 +79,37 @@ class Cleanup:
                     f"Failed to destroy entity {[entity['id']]} in corpus {self.corpus_id}: {e.status_code} - {e.content}."
                 )
 
+    def destroy_metadata_entity(self):
+        # List text_line in corpus https://demo.arkindex.org/api-docs/#tag/elements
+        logging.info("Listing text_line")
+        try:
+            text_lines = self.cli.paginate(
+                "ListElements", corpus=self.corpus_id, type="text_line"
+            )
+        except ErrorResponse as e:
+            logging.error(
+                f"Failed to list text_line in corpus {self.corpus_id}: {e.status_code} - {e.content}."
+            )
+
+        for text_line in text_lines:
+            # List Metadata in the corpus https://demo.arkindex.org/api-docs/#operation/ListElementMetaData
+            try:
+                metadatas = self.cli.paginate("ListElementMetaData", id=text_line["id"])
+            except ErrorResponse as e:
+                logging.error(
+                    f"Failed to list metadata in text_line {text_line['id']}: {e.status_code} - {e.content}."
+                )
+
+            for metadata in metadatas:
+                if metadata["name"].lower() == "entity":
+                    # Destroy metadata https://demo.arkindex.org/api-docs/#operation/DestroyMetaData
+                    try:
+                        self.cli.request("DestroyMetaData", id=metadata["id"])
+                    except ErrorResponse as e:
+                        logging.error(
+                            f"Failed to destroy entity {metadata['id']} in corpus {self.corpus_id}: {e.status_code} - {e.content}."
+                        )
+
     def run(self):
         # Destroying text_segment in all the volume of the corpus
         corpus_volumes = self.cli.paginate(
@@ -93,6 +124,9 @@ class Cleanup:
         # Destroying the entities of the corpus
         if self.full_cleanup:
             self.destroy_entities()
+
+        # Destroy metadata entity
+        self.destroy_metadata_entity()
 
 
 def main():
