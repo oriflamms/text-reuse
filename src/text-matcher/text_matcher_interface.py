@@ -297,9 +297,6 @@ class CreatingHtml:
             "w",
         ) as file:
             for i, row in enumerate(bio_list):
-                # Add the match to the csv of match
-                # if row[1][0] == "B" and self.link:
-                #    list_link.append(os.path.join(ARKINDEX_VOLUME_URL, link_data[i][1]))
                 file.write(f'{" ".join(row)}\n')
 
         # Order the overlap

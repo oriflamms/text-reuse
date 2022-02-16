@@ -160,8 +160,6 @@ class SqlToCsv:
                     )
                     file.write(trans)
                     if trans:
-                        # for word in trans.split():
-                        #     list_word_id_page.append([word, page_id[0]])
                         for letter in trans:
                             list_word_id_page.append([letter, page_id[0]])
 
@@ -173,8 +171,6 @@ class SqlToCsv:
                     )
                     file.write(trans)
                     if trans:
-                        # for word in trans.split():
-                        #     list_word_id_page.append([word, page_id[0]])
                         for letter in trans:
                             list_word_id_page.append([letter, page_id[0]])
 
