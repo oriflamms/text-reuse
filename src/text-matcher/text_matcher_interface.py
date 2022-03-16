@@ -33,6 +33,7 @@ class CreatingHtml:
         ngrams,
         mindistance,
         match_merger,
+        extended_match,
     ):
         """Initiate the class"""
         self.volumes = volume_path
@@ -46,6 +47,7 @@ class CreatingHtml:
         self.ngrams = ngrams
         self.minDistance = mindistance
         self.match_merger = match_merger
+        self.extended_match = extended_match
 
         # List of ref text in order of apparition and link of arkindex for the page
         self.list_order_ref = []
@@ -133,15 +135,49 @@ class CreatingHtml:
     def new_interface(self, text, ref, df):
         """Create a html and a bio file for a txt file"""
         # Prepare the list of match
-
         match = self.getting_info(text, ref, False)
+
+        # Read the text of interest
+        with open(text, "r") as file_text:
+            text_raw = file_text.read()
 
         # Organizing match
         list_match = []
+        save_ref_name = []
+        len_text = len(text_raw)
         for ref_match in reversed(match):
             name_ref = os.path.basename(ref_match[0]).replace(".txt", "")
             for i in range(len(ref_match[1])):
-                list_match.append([ref_match[1][i], ref_match[2][i], name_ref])
+                if not self.extended_match:
+                    list_match.append([ref_match[1][i], ref_match[2][i], name_ref])
+
+                if name_ref not in save_ref_name and self.extended_match:
+                    with open(os.path.join(ref, f"{name_ref}.txt"), "r") as psalm_file:
+                        len_ref_text = psalm_file.read().__len__()
+                        # Replace first position from the number of character before the match in the ref text
+                        if ref_match[1][i][0] - ref_match[2][i][0] < 0:
+                            first_position = 0
+                        else:
+                            first_position = ref_match[1][i][0] - ref_match[2][i][0]
+
+                        # Replace last position from the number of character after the match in the ref text
+                        if (
+                            ref_match[1][i][1] + (len_ref_text - ref_match[2][i][1])
+                            > len_text
+                        ):
+                            last_position = len_text - 1
+                        else:
+                            last_position = ref_match[1][i][1] + (
+                                len_ref_text - ref_match[2][i][1]
+                            )
+                        list_match.append(
+                            [
+                                (first_position, last_position),
+                                (0, len_ref_text),
+                                name_ref,
+                            ]
+                        )
+                    save_ref_name.append(name_ref)
 
         df_match = pd.DataFrame(
             data=list_match, columns=["pos_text", "pos_ref", "name_ref"]
@@ -149,10 +185,6 @@ class CreatingHtml:
 
         # Order the match in function of their localization in the text
         match = sorted(match, key=lambda x: x[1])
-
-        # Read the text of interest
-        with open(text, "r") as file_text:
-            text_raw = file_text.read()
 
         # Copy text for bio file
         true_text = []
@@ -199,6 +231,14 @@ class CreatingHtml:
             bio_text[row["pos_text"][0]][1] = f"B-{h_tag}"
             bio_text[row["pos_text"][1]][1] = "E"
             list_ref.append(name_text)
+            list_link.append(
+                os.path.join(ARKINDEX_VOLUME_URL, link_data[row["pos_text"][0]][1])
+            )
+
+        # Add info of match on list_order_ref to be exported
+        assert len(list_ref) == len(list_link)
+        self.list_order_ref.append(list_ref)
+        self.list_order_ref.append(list_link)
 
         # Create the table with word and bio tag
         tag = "O"
@@ -257,14 +297,7 @@ class CreatingHtml:
             "w",
         ) as file:
             for i, row in enumerate(bio_list):
-                # Add the match to the csv of match
-                if row[1][0] == "B" and self.link:
-                    list_link.append(os.path.join(ARKINDEX_VOLUME_URL, link_data[i][1]))
                 file.write(f'{" ".join(row)}\n')
-
-        # Add info of match on list_order_ref to be exported
-        self.list_order_ref.append(list_ref)
-        self.list_order_ref.append(list_link)
 
         # Order the overlap
         count_overlap = 0
@@ -280,8 +313,8 @@ class CreatingHtml:
                 count_overlap += 1
 
         # HTML Creation
-        start_tag = "<mark>"
-        end_tag = "</mark>"
+        end_tag = "</marka>"
+        start_tag = "<marka>"
         html_text = ""
         list_save_ref = []
         for i, word in enumerate(bio_list):
@@ -338,10 +371,25 @@ class CreatingHtml:
                 html_text += text_ref + start_tag + word[0] + " "
                 if bio_list[i + 1][1][0] == "B":
                     html_text += end_tag
+                    # Change the color of the match for a better visibility
+                    if start_tag == "<marka>":
+                        start_tag = "<markb>"
+                        end_tag = "</markb>"
+                    else:
+                        start_tag = "<marka>"
+                        end_tag = "</marka>"
+
             elif word[1][0] == "I":
                 html_text += word[0] + " "
                 if bio_list[i + 1][1][0] != "I":
                     html_text += end_tag
+                    # Change the color of the match for a better visibility
+                    if start_tag == "<marka>":
+                        start_tag = "<markb>"
+                        end_tag = "</markb>"
+                    else:
+                        start_tag = "<marka>"
+                        end_tag = "</marka>"
 
         # Assert that all matches where treated
         assert len(df_match) == len(list_match)
@@ -531,9 +579,6 @@ class CreatingHtml:
         with open(self.metadata_heurist, newline="") as meta_file:
             meta = list(csv.reader(meta_file, delimiter=","))
 
-        for line in meta:
-            print(line)
-
         ref_tab = []
         list_nb_word_max = []
         list_name_ref = []
@@ -670,6 +715,13 @@ def main():
         action="store_true",
     )
     parser.add_argument(
+        "-e",
+        "--extended-match",
+        help="Extend the match found by the total of character in the reference text",
+        required=False,
+        action="store_true",
+    )
+    parser.add_argument(
         "-t",
         "--threshold",
         required=False,
@@ -716,6 +768,7 @@ def main():
         args["ngrams"],
         args["mindistance"],
         args["match_merger"],
+        args["extended_match"],
     )
 
     creation.create_html()

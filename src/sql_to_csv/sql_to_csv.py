@@ -160,8 +160,8 @@ class SqlToCsv:
                     )
                     file.write(trans)
                     if trans:
-                        for word in trans.split():
-                            list_word_id_page.append([word, page_id[0]])
+                        for letter in trans:
+                            list_word_id_page.append([letter, page_id[0]])
 
             # Extraction for double paged book
             elif self.type_page == "double page":
@@ -171,8 +171,8 @@ class SqlToCsv:
                     )
                     file.write(trans)
                     if trans:
-                        for word in trans.split():
-                            list_word_id_page.append([word, page_id[0]])
+                        for letter in trans:
+                            list_word_id_page.append([letter, page_id[0]])
 
             else:
                 logging.info("The Digitization type is not regular")
