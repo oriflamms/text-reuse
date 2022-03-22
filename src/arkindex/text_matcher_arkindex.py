@@ -17,7 +17,7 @@ class CreateMatchArkindex:
         self.cli = ArkindexClient(**options_from_env())
         self.corpus_id = args.get("corpus")
         self.type_element_parent = args.get("type")
-        self.list_entities = []
+        self.entities_classes = []
         logging.basicConfig(format="[%(levelname)s] %(message)s", level=logging.INFO)
 
     @staticmethod
@@ -38,12 +38,12 @@ class CreateMatchArkindex:
         """Match volume against text of reference and return position of match"""
         # Pairs of text to be matched against
         pairs = list(
-            itertools.product(["volume"], [item[0] for item in self.list_entities])
+            itertools.product(["volume"], [item[0] for item in self.entities_classes])
         )
 
         # Dictionary of texts
         texts = {"volume": volume_transcription}
-        for row in self.list_entities:
+        for row in self.entities_classes:
             texts[row[0]] = row[2]
 
         prev_text_objs = {}
@@ -58,6 +58,7 @@ class CreateMatchArkindex:
                     prev_text_objs[filename] = Text(
                         self.normalization(texts[filename]), filename
                     )
+                    save_text = texts[filename]
 
             # More convenient naming
             text_obj_a = prev_text_objs[filename_a]
@@ -80,26 +81,47 @@ class CreateMatchArkindex:
 
             # Write to the log, but only if a match is found
             if pair_match.numMatches > 0:
-                matches.append([pair[1], pair_match.locationsA])
+                matches.append(
+                    [
+                        pair[1],
+                        pair_match.locationsA,
+                        pair_match.locationsB,
+                        len(save_text),
+                    ]
+                )
 
         return matches
 
-    def list_corpus_entities(self):
-        """List the entity inside the corpus"""
-        logging.info("List the entity")
+    def list_corpus_entities_and_classes(self):
+        """List the entity and the class inside the corpus"""
+        logging.info("Listing the entities and the classes of the corpus")
+        # Listing the entities
         try:
-            list_corpus_entities = self.cli.paginate(
-                "ListCorpusEntities", id=self.corpus_id
-            )
+            corpus_entities = self.cli.paginate("ListCorpusEntities", id=self.corpus_id)
         except ErrorResponse as e:
             logging.error(
                 f"Failed to list corpus entity in corpus {self.corpus_id}: {e.status_code} - {e.content}."
             )
 
-        for element in list_corpus_entities:
-            self.list_entities.append(
-                [element["id"], element["name"], element["metas"]["text"]]
+        # Insert in tab all the information necessary to connect entities with their class : [id_entity, name_obj, text_obj, EMPTY] (EMPTY : where the class ID will be)
+        for entity in corpus_entities:
+            self.entities_classes.append(
+                [entity["id"], entity["name"], entity["metas"]["text"], ""]
             )
+
+        # Listing the classes
+        try:
+            corpus_classes = self.cli.paginate("ListCorpusMLClasses", id=self.corpus_id)
+        except ErrorResponse as e:
+            logging.error(
+                f"Failed to list classes in corpus {self.corpus_id}: {e.status_code} - {e.content}"
+            )
+
+        # Add the class_id in EMPTY to complete the link between class and entity
+        for _class in corpus_classes:
+            for row in self.entities_classes:
+                if _class["name"] == row[1]:
+                    row[3] = _class["id"]
 
     # get_text_lines_centroid
     def get_text_lines_from_page_id(self, page_id):
@@ -125,6 +147,8 @@ class CreateMatchArkindex:
                     element["text"],
                     Polygon(element["element"]["zone"]["polygon"]).centroid.x,
                     Polygon(element["element"]["zone"]["polygon"]).centroid.y,
+                    element["element"]["zone"]["polygon"],
+                    element["element"]["id"],
                 ]
             )
 
@@ -169,6 +193,7 @@ class CreateMatchArkindex:
             logging.error(
                 f"Failed to list metadata for volume {volume_id}: {e.status_code} - {e.content}."
             )
+            return
         except StopIteration:
             raise StopIteration(
                 f"Failed to retrieve Digitization Type metadata for volume {volume_id}."
@@ -188,7 +213,6 @@ class CreateMatchArkindex:
             logging.error(
                 f"Failed to create {body_request} on page {id_page}: {e.status_code} - {e.content}."
             )
-            return
 
         return page_transcription["id"]
 
@@ -211,9 +235,32 @@ class CreateMatchArkindex:
                 f"Failed to create transcription entity {body_request_transcription_entity} in corpus {self.corpus_id}: {e.status_code} - {e.content}."
             )
 
+    def create_text_segment(self, parent_id, name, polygon, ml_class):
+        logging.info("Create element")
+        body = {
+            "type": "text_segment",
+            "name": name,
+            "corpus": self.corpus_id,
+            "parent": parent_id,
+            "polygon": polygon,
+        }
+        try:
+            response_create_element = self.cli.request(
+                "CreateElement",
+                slim_output=True,
+                body=body,
+            )
+        except ErrorResponse as e:
+            logging.error(
+                f"Failed to create text_segment element {body} in corpus {self.corpus_id}: {e.status_code} - {e.content}."
+            )
+
+        self.create_classification(response_create_element["id"], ml_class)
+
     def form_transcription_book(self, volume_id):
-        letter_page_id_offset = []
+        """Form transcription from a book id on Arkindex"""
         list_page_id_transcription_id = []
+        letter_page_id_offset = []
         volume_transcription = ""
         logging.info("Forming transcription")
         # Check type of the book
@@ -223,7 +270,7 @@ class CreateMatchArkindex:
         logging.info("Getting page")
         # Get info on pages
         try:
-            list_volume_page = self.cli.paginate(
+            volume_pages = self.cli.paginate(
                 "ListElementChildren", id=volume_id, type="page"
             )
         except ErrorResponse as e:
@@ -231,9 +278,9 @@ class CreateMatchArkindex:
                 f"Failed to list element children in corpus {self.corpus_id}: {e.status_code} - {e.content}."
             )
 
-        for element in list_volume_page:
+        for page in volume_pages:
 
-            page_text_lines = self.get_text_lines_from_page_id(element["id"])
+            page_text_lines = self.get_text_lines_from_page_id(page["id"])
             if digitization_type == "double page" and page_text_lines:
                 page_text_lines = self.order_double_page(page_text_lines)
             elif digitization_type == "single page" and page_text_lines:
@@ -245,74 +292,121 @@ class CreateMatchArkindex:
             for row in page_text_lines:
                 volume_transcription += row[0] + " "
                 for char in list(row[0]):
-                    letter_page_id_offset.append([char, element["id"], offset])
+                    letter_page_id_offset.append(
+                        [char, page["id"], offset, row[3], row[4]]
+                    )
                     offset += 1
-                page_transcription += row[0] + " "
-                letter_page_id_offset.append([" ", element["id"], offset + 1])
+                page_transcription += row[0] + "\n"
+                letter_page_id_offset.append(
+                    [" ", page["id"], offset + 1, row[3], row[4]]
+                )
 
             # Create transcription on page
             if page_transcription:
                 id_transcription = self.create_transcription(
-                    element["id"], page_transcription
+                    page["id"], page_transcription
                 )
                 # Create a list with relation between transcription id and page id
-                list_page_id_transcription_id.append([element["id"], id_transcription])
+                list_page_id_transcription_id.append([page["id"], id_transcription])
         return (
             volume_transcription,
             list_page_id_transcription_id,
             letter_page_id_offset,
         )
 
+    def create_classification(self, element_id, ml_class):
+        logging.info("Creating classification")
+        try:
+            self.cli.request(
+                "CreateClassification",
+                body={"element": element_id, "ml_class": ml_class},
+            )
+        except ErrorResponse as e:
+            logging.error(
+                f"Failed to create classification {ml_class} in text_line {element_id}: {e.status_code} - {e.content}."
+            )
+
     def push_matches_to_arkindex(
         self, matched_results, list_page_id_transcription_id, letter_page_id_offset
     ):
+        """Push match to Arkindex"""
         for match in matched_results:
 
             # Iterate through match inside each reference text
             for intra_match in match[1]:
-                id_page = letter_page_id_offset[intra_match[0]][1]
+
                 offset = letter_page_id_offset[intra_match[0]][2]
                 id_entity = match[0]
-                first_position = letter_page_id_offset[intra_match[0]][2]
+                # start_match = intra_match[0]  # Start indicated by text-matcher
+                # end_match = intra_match[1]  # End indicated by text-matcher
+                start_approx = (
+                    intra_match[0] - match[2][0][0]
+                )  # Start extended with the info on the text of ref
+                end_approx = (
+                    intra_match[1] + match[3] - match[2][0][1]
+                )  # End extended with the info on the text of ref
+                text_line_id = letter_page_id_offset[start_approx][4]
 
-                # Create element in Arkindex
-                for e in range(intra_match[0], intra_match[1]):
-                    if id_page != letter_page_id_offset[e + 1][1]:
-                        last_position = letter_page_id_offset[e][2]
-                        # Find the id of the transcription element for the page
+                # Add class to text_line at the beginning of the match
+                for entity_class in self.entities_classes:
+                    if match[0] == entity_class[0]:
+                        # Catch the id of the class and add the class to the text_line
+                        class_id = entity_class[3]
+                        self.create_classification(text_line_id, class_id)
+
+                    elif "Beginning" in entity_class:
+                        # Add Beginning class to text_line
+                        self.create_classification(text_line_id, entity_class[3])
+
+                    elif "Inside" in entity_class:
+                        # Catch the id of the Inside class
+                        i_class_id = entity_class[3]
+
+                # Create entity for the intra match
+                for entity_class in self.entities_classes:
+                    if match[0] == entity_class[0]:
+                        self.create_text_segment(
+                            letter_page_id_offset[start_approx][1],
+                            entity_class[1],
+                            letter_page_id_offset[start_approx][3],
+                            entity_class[3],
+                        )
+
+                # Create transcription entity for each intra_match
+                for ind, row in enumerate(
+                    letter_page_id_offset[start_approx:end_approx]
+                ):
+                    if (
+                        start_approx + ind == end_approx - 1
+                        or row[1] != letter_page_id_offset[start_approx + ind + 1][1]
+                    ):  # Check if the match continue on a different page
+                        # Get the id of the transcription on the page
                         id_transcription = [
-                            row[1]
-                            for row in list_page_id_transcription_id
-                            if id_page in row[0]
+                            info_trans[1]
+                            for info_trans in list_page_id_transcription_id
+                            if row[1] in info_trans[0]
                         ]
-
-                        # Create the transcription entity for entity that follow to the next page
+                        # Push the transcription entity on Arkindex
                         self.create_transcription_entity(
                             id_transcription[0],
                             id_entity,
                             offset,
-                            abs(last_position - first_position - 1),
+                            row[2] - offset,  # Number of character in the entity
                         )
-
-                        # Update the marker
                         offset = 0
-                        first_position = 0
-                        id_page = letter_page_id_offset[e][1]
-                id_transcription = [
-                    row[1] for row in list_page_id_transcription_id if id_page in row[0]
-                ]
-                last_position = letter_page_id_offset[intra_match[1]][2]
 
-                # Create transcription element for entity that stop in the middle of the page
-                self.create_transcription_entity(
-                    id_transcription[0],
-                    id_entity,
-                    offset,
-                    last_position - first_position,
-                )
+                    # Add class in the metadata of the new text_line
+                    if row[4] != text_line_id:
+                        text_line_id = row[4]
+
+                        # Add Beginning class to text_line
+                        self.create_classification(text_line_id, i_class_id)
+
+                        # Add the class to the text_line
+                        self.create_classification(text_line_id, class_id)
 
     def run(self):
-        # List al the volume in corpus
+        # List all the volume in corpus
         try:
             corpus_volumes = self.cli.paginate(
                 "ListElements", corpus=self.corpus_id, type=self.type_element_parent
@@ -322,9 +416,10 @@ class CreateMatchArkindex:
                 f"Failed to list volume in corpus {self.corpus_id}: {e.status_code} - {e.content}"
             )
 
-        self.list_corpus_entities()
+        self.list_corpus_entities_and_classes()
 
         for volume in corpus_volumes:
+
             # Form the volume transcription
             (
                 volume_transcription,
@@ -335,7 +430,7 @@ class CreateMatchArkindex:
             # Apply text_matcher
             matched_results = self.text_matcher(volume_transcription)
 
-            # Send match to arkindex
+            # Send match to Arkindex
             self.push_matches_to_arkindex(
                 matched_results, list_page_id_transcription_id, letter_page_id_offset
             )
