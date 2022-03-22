@@ -39,6 +39,35 @@ class CreateClass:
                         f"Failed to create class {row[1]} in corpus {self.corpus_id}: {e.status_code} - {e.content}."
                     )
 
+    def create_begin_inside_class(self):
+        # Create beginning class
+        try:
+            self.cli.request(
+                "CreateMLClass", id=self.corpus_id, body={"name": "Beginning"}
+            )
+            logger.info(f"Created class Beginning in corpus {self.corpus_id}")
+
+        except ErrorResponse as e:
+            logger.error(
+                f"Failed to create class Beginning in corpus {self.corpus_id}: {e.status_code} - {e.content}."
+            )
+
+        # Create inside class
+        try:
+            self.cli.request(
+                "CreateMLClass", id=self.corpus_id, body={"name": "Inside"}
+            )
+            logger.info(f"Created class Inside in corpus {self.corpus_id}")
+
+        except ErrorResponse as e:
+            logger.error(
+                f"Failed to create class Inside in corpus {self.corpus_id}: {e.status_code} - {e.content}."
+            )
+
+    def run(self):
+        self.create_request()
+        self.create_begin_inside_class()
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -57,8 +86,7 @@ def main():
 
     args = vars(parser.parse_args())
 
-    class_creator = CreateClass(args)
-    class_creator.create_request()
+    CreateClass(args).run()
 
 
 if __name__ == "__main__":

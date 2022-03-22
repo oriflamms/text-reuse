@@ -31,14 +31,13 @@ class CreateEntities:
         self.entity_dict = {}
         logging.basicConfig(format="[%(levelname)s] %(message)s", level=logging.INFO)
 
-    def create_dict(self):
+    def run(self):
         """Create the body of the request for each reference text"""
 
         # Read the metadata
         with open(self.metadata_path, newline="") as meta_file:
             entity_list = csv.reader(meta_file, delimiter=",")
 
-            type_d = "misc"
             for meta_row in entity_list:
                 text_path = [
                     ref
@@ -53,7 +52,7 @@ class CreateEntities:
                         property1 = psalm_file.read()
 
                     self.entity_dict["name"] = name
-                    self.entity_dict["type"] = type_d
+                    self.entity_dict["type"] = "misc"
                     self.entity_dict["metas"] = {
                         "text": property1,
                         "heurist_id": heurist_id,
@@ -62,6 +61,9 @@ class CreateEntities:
                     self.entity_dict["corpus"] = self.corpus_id
 
                     self.push_to_arkindex()
+
+        # Create beginning entity
+        self.create_begin_inside_entity()
 
     def push_to_arkindex(self):
         """Create the entity on Arkindex"""
@@ -73,6 +75,35 @@ class CreateEntities:
         except ErrorResponse as e:
             logging.error(
                 f"Failed to create entity {self.entity_dict['name']} in corpus {self.corpus_id}: {e.status_code} - {e.content}."
+            )
+
+    def create_begin_inside_entity(self):
+        """Create the entity of beginning"""
+        logging.info("Creating beginning entity")
+        try:
+            body = {
+                "name": "Beginning",
+                "type": "misc",
+                "metas": {"text": "Beginning marker"},
+                "corpus": self.corpus_id,
+            }
+            self.cli.request("CreateEntity", body=body)
+        except ErrorResponse as e:
+            logging.error(
+                f"Failed to create entity Beginning in corpus {self.corpus_id}: {e.status_code} - {e.content}."
+            )
+        logging.info("Creating inside entity")
+        try:
+            body = {
+                "name": "Inside",
+                "type": "misc",
+                "metas": {"text": "Beginning marker"},
+                "corpus": self.corpus_id,
+            }
+            self.cli.request("CreateEntity", body=body)
+        except ErrorResponse as e:
+            logging.error(
+                f"Failed to create entity Beginning in corpus {self.corpus_id}: {e.status_code} - {e.content}."
             )
 
 
@@ -101,7 +132,7 @@ def main():
     args = vars(parser.parse_args())
 
     entity_creator = CreateEntities(args)
-    entity_creator.create_dict()
+    entity_creator.run()
 
 
 if __name__ == "__main__":
