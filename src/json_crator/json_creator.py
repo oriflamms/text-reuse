@@ -13,7 +13,10 @@ from apistar.exceptions import ErrorResponse
 from arkindex import ArkindexClient, options_from_env
 from shapely.geometry import Polygon
 
-NewPageClassification = namedtuple("NewPageClassification", ["id_page", "list_class"])
+PageClassification = namedtuple(
+    "PageClassification", ["id_page", "ordering", "list_class"]
+)
+TextLine = namedtuple("TextLine", ["text", "x", "y"])
 TextSegment = namedtuple("TextSegment", ["name_ref", "x", "y", "w", "h"])
 LineTranscription = namedtuple("LineTranscription", ["text", "x", "y", "w", "h"])
 ID_RANGE = "https://arkindex.teklia.com/api/v1/"
@@ -75,6 +78,7 @@ class JsonCreator:
         for fetched_page in list_page_ordering:
             # Giving proper name to variables
             id_page = fetched_page[0]
+            ordering = fetched_page[1]
 
             # Get transcription and position on page and save it in a dictionary ordered by page id
             self.cursor.execute(
@@ -111,16 +115,24 @@ class JsonCreator:
                 f"select name, polygon from element where id in (select child_id from element_path where parent_id='{id_page}') and type='text_segment'"
             )
             list_text_segments = []
-            list_class_new = []
+            list_class = []
             for segment in self.cursor.fetchall():
                 list_text_segments.append(
                     self.text_segment_creation(segment[1], segment[0])
                 )
-                list_class_new.append(segment[0])
-            text_segments[id_page] = list_text_segments
-            page_classification.append(NewPageClassification(id_page, list_class_new))
+                if segment[0] not in list_class:
+                    list_class.append(segment[0])
 
-        return line_transcriptions, text_segments, page_classification
+            text_segments[id_page] = list_text_segments
+            page_classification.append(
+                PageClassification(id_page, ordering, list_class)
+            )
+
+            self.cursor.execute(
+                f"select id, polygon from element where id in (select child_id from element_path where parent_id='{id_page}') and type='text_line'"
+            )
+
+        return page_classification, line_transcriptions, text_segments
 
     def form_formulary(self, id_folder):
         """Forming formulary"""
@@ -131,9 +143,9 @@ class JsonCreator:
             logging.error(f"Failed to retrieve folder manifest. {e.content}")
 
         (
+            page_classifications,
             line_transcriptions,
             text_segments,
-            page_classification,
         ) = self.get_list_page_for_classification(id_folder)
 
         # Add transcription on page at their right position
@@ -185,6 +197,9 @@ class JsonCreator:
             if "canvases" in element.keys():
                 report[element["canvases"][0].split("/")[-3]] = element["canvases"][0]
 
+        # Order the list of page
+        page_classification = sorted(page_classifications, key=lambda page: page[1])
+
         list_ref = []  # List of ref already registered
         class_ranges = {}
 
@@ -198,7 +213,7 @@ class JsonCreator:
                     if p_class not in list_ref:
                         list_ref.append(p_class)
                         class_ranges[p_class] = {
-                            "@id": f"{ID_RANGE}_{ind}/range/",
+                            "@id": f"{ID_RANGE}{page.ordering}_{ind}/range/",
                             "@type": "sc:Range",
                             "label": p_class,
                             "ranges": [],
