@@ -14,7 +14,7 @@ class Cleanup:
     def __init__(self, args):
         self.cli = ArkindexClient(**options_from_env())
         self.corpus_id = args.get("corpus")
-        self.full_cleanup = args.get("full_cleanup")
+        self.entities = args.get("entities")
         self.type = args.get("type")
         logging.basicConfig(format="[%(levelname)s] %(message)s", level=logging.INFO)
 
@@ -51,9 +51,10 @@ class Cleanup:
                     )
 
     def destroy_text_segments(self):
+        """Destroy text_segment"""
         logging.info(f"Destroying text segments in corpus {self.corpus_id}")
         try:
-            self.cli.paginate(
+            self.cli.request(
                 "DestroyElements", corpus=self.corpus_id, type="text_segment"
             )
         except ErrorResponse as e:
@@ -80,7 +81,7 @@ class Cleanup:
                 )
 
     def destroy_metadata_entity(self):
-        # List text_line in corpus https://demo.arkindex.org/api-docs/#tag/elements
+        """Destroy the metadata on text_line"""
         logging.info("Listing text_line")
         try:
             text_lines = self.cli.paginate(
@@ -92,7 +93,6 @@ class Cleanup:
             )
 
         for text_line in text_lines:
-            # List Metadata in the corpus https://demo.arkindex.org/api-docs/#operation/ListElementMetaData
             try:
                 metadatas = self.cli.paginate("ListElementMetaData", id=text_line["id"])
             except ErrorResponse as e:
@@ -102,17 +102,15 @@ class Cleanup:
 
             for metadata in metadatas:
                 if metadata["name"].lower() == "entity":
-                    # Destroy metadata https://demo.arkindex.org/api-docs/#operation/DestroyMetaData
                     try:
                         self.cli.request("DestroyMetaData", id=metadata["id"])
                     except ErrorResponse as e:
                         logging.error(
-                            f"Failed to destroy entity {metadata['id']} in corpus {self.corpus_id}: {e.status_code} - {e.content}."
+                            f"Failed to destroy entity metadata {metadata['id']} in corpus {self.corpus_id}: {e.status_code} - {e.content}."
                         )
 
-    def clean_classification(self):
+    def clear_classification(self):
         """Destroy classification"""
-        print("https://demo.arkindex.org/api-docs/#operation/RejectClassification")
         try:
             text_lines = self.cli.paginate(
                 "ListElements",
@@ -127,39 +125,43 @@ class Cleanup:
 
         for text_line in text_lines:
             if text_line["classes"]:
-                try:
-                    self.cli.request(
-                        "RejectClassification",
-                        id=text_line["classes"][0]["id"],
-                        body={
-                            "ml_class": text_line["classes"][0]["ml_class"]["id"],
-                            "state": "rejected",
-                        },
-                    )
-                except ErrorResponse as e:
-                    logging.error(
-                        f"Failed to list text_line in corpus {self.corpus_id}: {e.status_code} - {e.content}."
-                    )
+                for one_class in text_line["classes"]:
+                    try:
+                        self.cli.request(
+                            "RejectClassification",
+                            id=one_class["id"],
+                            body={
+                                "ml_class": {"name": one_class["ml_class"]["name"]},
+                                "state": "rejected",
+                            },
+                        )
+                    except ErrorResponse as e:
+                        logging.error(
+                            f"Failed to to reject classification {one_class['ml_class']['name']} on {text_line} in corpus {self.corpus_id}: {e.status_code} - {e.content}."
+                        )
 
     def run(self):
         # Destroying text_segment in all the volume of the corpus
         corpus_volumes = self.cli.paginate(
             "ListElements", corpus=self.corpus_id, type=self.type
         )
-        self.clean_classification()
 
         for volume in corpus_volumes:
             self.destroy_transcription(volume["id"])
 
-        # Destroying the class in the volume of the corpus
+        # All the function below can only work on corpus size (not able to destroy on only one volume)
+        # Destroy classification on all corpus
+        self.clear_classification()
+
+        # Destroy all the element named "text_segment" in the corpus
         self.destroy_text_segments()
 
-        # Destroying the entities of the corpus
-        if self.full_cleanup:
-            self.destroy_entities()
-
         # Destroy metadata entity
-        # self.destroy_metadata_entity()
+        self.destroy_metadata_entity()
+
+        # Destroying the entities of the corpus
+        if self.entities:
+            self.destroy_entities()
 
 
 def main():
@@ -173,8 +175,8 @@ def main():
         type=str,
     )
     parser.add_argument(
-        "-f",
-        "--full-cleanup",
+        "-e",
+        "--entities",
         help="If true destroy also the entity of the corpus",
         required=False,
         action="store_true",
