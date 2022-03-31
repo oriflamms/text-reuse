@@ -16,9 +16,9 @@ from shapely.geometry import Polygon
 PageClassification = namedtuple(
     "PageClassification", ["id_page", "ordering", "list_class"]
 )
-TextLine = namedtuple("TextLine", ["text", "x", "y"])
 TextSegment = namedtuple("TextSegment", ["name_ref", "x", "y", "w", "h"])
 LineTranscription = namedtuple("LineTranscription", ["text", "x", "y", "w", "h"])
+AnnotationObject = namedtuple("AnnotationObject", ["type", "name", "x", "y", "w", "h"])
 ID_RANGE = "https://arkindex.teklia.com/api/v1/"
 
 
@@ -30,6 +30,9 @@ class JsonCreator:
         self.cursor = None
         self.digitization_type = None
         self.output_path = args.get("output_path")
+        self.miniature = args.get("miniature")
+        self.initial = args.get("initial")
+        self.rubrication = args.get("rubrication")
 
     def __enter__(self):
         """Create a connection to the database"""
@@ -63,7 +66,32 @@ class JsonCreator:
             text, min(x), min(y), (max(x) - min(x)), (max(y) - min(y))
         )
 
-    def get_list_page_for_classification(self, id_folder):
+    def order_lines(self, list_lines):
+        if self.digitization_type == "single page" and list_lines:
+            list_text_lines = sorted(list_lines, key=lambda x: x.y)
+
+        elif self.digitization_type == "double page" and list_lines:
+            # Order on the x_axis to find the min and max value
+            sorted_lines_x = sorted(list_lines, key=lambda x: x.x)
+            # Find the limit between left and right pages
+            x_limit = (sorted_lines_x[0][1] + sorted_lines_x[-1][1]) / 2
+
+            # Order list
+            sorted_lines_y = sorted(list_lines, key=lambda x: x.y)
+
+            list_text_lines = [row for row in sorted_lines_y if row[1] < x_limit]
+            list_text_lines += [row for row in sorted_lines_y if row[1] >= x_limit]
+
+        return list_text_lines
+
+    def object_creation(self, type, name, polygon):
+        coord = Polygon(ast.literal_eval(str(polygon)))
+        x, y = coord.minimum_rotated_rectangle.exterior.coords.xy
+        return AnnotationObject(
+            type, name, min(x), min(y), (max(x) - min(x)), (max(y) - min(y))
+        )
+
+    def get_info_from_dump(self, id_folder):
         """Return list of namedtuple of PageClassification with id_page, ordering and list_class"""
         self.cursor.execute(
             f"select child_id, ordering from element_path where parent_id = '{id_folder}' order by ordering"
@@ -73,6 +101,7 @@ class JsonCreator:
         line_transcriptions = {}
         text_segments = {}
         page_classification = []
+        page_objects = {}
 
         # Iterating through pages
         for fetched_page in list_page_ordering:
@@ -93,6 +122,53 @@ class JsonCreator:
                 list_text_lines.append(
                     self.line_transcription_creation(poly_text, trans_text)
                 )
+
+            # Add initial and rubrication to the list of text line to order them in the list of annotation
+            # Fetch the information on initial if asked by the user
+            if self.initial:
+                self.cursor.execute(
+                    f"select name, polygon from element where id in (select child_id from element_path where parent_id='{id_page}') and type = 'initial'"
+                )
+                for initial in self.cursor.fetchall():
+                    if initial:
+                        # Create Object
+                        list_text_lines.append(
+                            self.line_transcription_creation(
+                                initial[1], f"Initial {initial[0]}"
+                            )
+                        )
+
+            # Fetch the information on rubrication if asked by the user
+            if self.rubrication:
+                self.cursor.execute(
+                    f"select name, polygon from element where id in (select child_id from element_path where parent_id='{id_page}') and type='rubrication'"
+                )
+                for rubrication in self.cursor.fetchall():
+                    if rubrication:
+                        # Create Object
+                        list_text_lines.append(
+                            self.line_transcription_creation(
+                                rubrication[1], f"Rubrication {rubrication[0]}"
+                            )
+                        )
+
+            # Create a list of all the asked object
+            list_object = []
+            # Fetch the information on illustration if asked by the user
+            if self.miniature:
+                self.cursor.execute(
+                    f"select name, polygon from element where id in (select child_id from element_path where parent_id='{id_page}') and type = 'illustration'"
+                )
+
+                for illustration in self.cursor.fetchall():
+                    if illustration:
+                        # Create Object
+                        list_object.append(
+                            self.object_creation(
+                                "miniature", illustration[0], illustration[1]
+                            )
+                        )
+
             if self.digitization_type == "single page" and list_text_lines:
                 list_text_lines = sorted(list_text_lines, key=lambda x: x.y)
 
@@ -120,19 +196,20 @@ class JsonCreator:
                 list_text_segments.append(
                     self.text_segment_creation(segment[1], segment[0])
                 )
-                if segment[0] not in list_class:
-                    list_class.append(segment[0])
+                list_class.append(segment[0])
+            # Order the list of text segment
+            if len(list_text_segments) > 1:
+                list_text_segments = sorted(list_text_segments, key=lambda x: x.y)
 
             text_segments[id_page] = list_text_segments
             page_classification.append(
                 PageClassification(id_page, ordering, list_class)
             )
 
-            self.cursor.execute(
-                f"select id, polygon from element where id in (select child_id from element_path where parent_id='{id_page}') and type='text_line'"
-            )
+            # Add list of object to the list
+            page_objects[id_page] = list_object
 
-        return page_classification, line_transcriptions, text_segments
+        return page_classification, line_transcriptions, text_segments, page_objects
 
     def form_formulary(self, id_folder):
         """Forming formulary"""
@@ -146,7 +223,8 @@ class JsonCreator:
             page_classifications,
             line_transcriptions,
             text_segments,
-        ) = self.get_list_page_for_classification(id_folder)
+            page_objects,
+        ) = self.get_info_from_dump(id_folder)
 
         # Add transcription on page at their right position
         for element in manifest["sequences"][0]["canvases"]:
@@ -174,14 +252,39 @@ class JsonCreator:
                             "target": f"{element['@id']}#xywh={text_segment.x},{text_segment.y},{text_segment.w},{text_segment.h}",
                         }
                     )
+
+            # Add object as tagging annotation in manifest
+            if page_objects[page_id]:
+                for ind, page_object in enumerate(page_objects[page_id]):
+                    element["annotations"][0]["items"].append(
+                        {
+                            "id": f"{ID_RANGE}l1/object/{ind}",
+                            "type": "Annotation",
+                            "motivation": "tagging",
+                            "body": {
+                                "type": "TextualBody",
+                                "value": f"{page_object.type} {page_object.name}",
+                                "format": "text/plain",
+                            },
+                            "target": f"{element['@id']}#xywh={page_object.x},{page_object.y},{page_object.w},{page_object.h}",
+                        }
+                    )
+
             # Add transcription as commenting annotation in manifest
             if line_transcriptions[page_id]:
                 for ind, transcription in enumerate(line_transcriptions[page_id]):
+                    if (
+                        "Rubrication" in transcription.text
+                        or "Initial" in transcription.text
+                    ):
+                        motivation = "tagging"
+                    else:
+                        motivation = "commenting"
                     element["annotations"][0]["items"].append(
                         {
                             "id": f"{ID_RANGE}l1/{ind}",
                             "type": "Annotation",
-                            "motivation": "commenting",
+                            "motivation": motivation,
                             "body": {
                                 "type": "TextualBody",
                                 "value": transcription.text,
@@ -211,14 +314,13 @@ class JsonCreator:
                 for ind, p_class in enumerate(page.list_class):
                     # Register the class
                     if p_class not in list_ref:
-                        list_ref.append(p_class)
                         class_ranges[p_class] = {
                             "@id": f"{ID_RANGE}{page.ordering}_{ind}/range/",
                             "@type": "sc:Range",
                             "label": p_class,
                             "ranges": [],
                         }
-                    class_ranges[p_class]["ranges"].append(report[page.id_page])
+                        class_ranges[p_class]["ranges"].append(report[page.id_page])
 
         # Create ranges
         new_structures = []
@@ -244,7 +346,7 @@ class JsonCreator:
             json.dump(manifest, outfile)
 
     def run(self):
-        self.cursor.execute("select id from element where type = 'folder'")
+        self.cursor.execute("select id from element where type = 'volume'")
         id_folder = self.cursor.fetchall()
         for id_row in id_folder:
             try:
@@ -274,6 +376,27 @@ def main():
         "--output-path",
         help="Path where the output will be created",
         required=True,
+    )
+    parser.add_argument(
+        "-m",
+        "--miniature",
+        help="Add miniature in the manifest",
+        required=False,
+        action="store_true",
+    )
+    parser.add_argument(
+        "-i",
+        "--initial",
+        help="Add miniature in the manifest",
+        required=False,
+        action="store_true",
+    )
+    parser.add_argument(
+        "-r",
+        "--rubrication",
+        help="Add rubrication in the manifest",
+        required=False,
+        action="store_true",
     )
 
     args = vars(parser.parse_args())
